@@ -1,0 +1,63 @@
+RC51 COMPILER V03.03.37,  PLCRILDECLARATION      02/26/11  15:33:43  PAGE  1
+
+QCW(0x0002AE52)
+
+DOS RC51 COMPILER V03.03.37, COMPILATION OF MODULE PLCRILDECLARATION
+OBJECT MODULE PLACED IN C:\Documents and Settings\ib\My Documents\RemoterApplications\HOPLA\Compile\PlcRilDeclaration.obj
+COMPILER INVOKED BY: OJ(C:\Documents and Settings\ib\My Documents\RemoterApplications\HOPLA\Compile\PlcRilDeclaration.obj) PIN(c:\RI
+            -DE\Inc;C:\DOCUME~1\ib\LOCALS~1\Temp\RemoterTemp\SysPlc\;C:\DOCUME~1\ib\LOCALS~1\Temp\RemoterTemp\Fb\) PR(C:\Documents a
+            -nd Settings\ib\My Documents\RemoterApplications\HOPLA\Compile\List\PlcRilDeclaration.lst) LA FP(IEEE,FP251) NOGENERIC N
+            -OAM NOEXTEND CD NOINTVECTOR SB OE(2) IP PL(80) PW(132) MAXWAR(50) IS SIGNEDCHAR 
+
+stmt level    source
+   1          
+   2          
+   3          #include <C:\Program Files\Elsist\Remoter\Lib\Raisonance\Sfr043b300\ElSystemLib.h>
+   4          #include <C:\Program Files\Elsist\Remoter\Lib\Raisonance\Sfr036e000\ElPLCLib.h>
+   5          
+   6          #define PLC_BACKUP_COPY_START_ADDRESS 0x5200
+   7          at 0x5000 unsigned char PLCMemoryLogicInputs[256];
+   8          at 0x5100 unsigned char PLCMemoryLogicOutputs[256];
+   9          at 0x0000 unsigned char PLCMemoryFlags[1472];
+  10          PLCRTCDATA PLCRtcData;
+  11          
+  12          unsigned char PLCLogicInputDebouncingTime[24] = {
+  13          10,10,10,10,10,10,10,10,
+  14          10,10,10,10,10,10,10,10,
+  15          10,10,10,10,10,10,10,10,
+  16          };
+  17          unsigned char PLCLogicInputDebouncingBuffer[24];
+  18          #pragma noinitstaticvar
+  19          at PLC_BACKUP_COPY_START_ADDRESS BACKUPHEADERSTRUCT PLCBackupHeader;
+  20          at (PLC_BACKUP_COPY_START_ADDRESS+sizeof(BACKUPHEADERSTRUCT)) unsigned char PLCBackupDataArea[128];
+  21          #pragma initstaticvar
+  22          
+  23          //[End of File]
+  24          
+RC51 COMPILER V03.03.37,  PLCRILDECLARATION      02/26/11  15:33:43  PAGE  2
+
+ASSEMBLY LISTING OF GENERATED OBJECT CODE
+
+RC51 COMPILER V03.03.37,  PLCRILDECLARATION      02/26/11  15:33:43  PAGE  3
+
+NAME                                    CLASS   MSPACE  TYPE    OFFSET  SIZE
+====                                    =====   ======  ====    ======  ====
+
+PLCRtcData . . . . . . . . . . . . . .  PUBLIC  XDATA   STRUCT  0000H   8    
+PLCLogicInputDebouncingTime. . . . . .  PUBLIC  XDATA   ARRAY   0008H   24   
+PLCLogicInputDebouncingBuffer. . . . .  PUBLIC  XDATA   ARRAY   0020H   24   
+RC51 COMPILER V03.03.37,  PLCRILDECLARATION      02/26/11  15:33:43  PAGE  4
+
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   ----    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =     56    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+RC51 COMPILATION COMPLETE.  0 WARNING,  0 ERROR

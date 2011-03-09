@@ -1,0 +1,271 @@
+MS-DOS LX51 CODE BANKING LINKER/LOCATOR V05.01.25
+
+
+INTER-MODULE CROSS-REFERENCE LISTING
+------------------------------------
+
+          NAME. . . . . . . . USAGE   MODULE NAMES
+          ----------------------------------------
+          ?C_CBADDMUL . . . . CODE    [_C_CBAM]:  CFILE
+          ?C_CPY  . . . . . . CODE    [STRCPY]: 
+          ?C_DECDPTR  . . . . CODE    [_C_DECDP]:  BACKUP
+          ?C_DPTR2DPTR  . . . CODE    [_C_DP2DP]:  SETTERMIOVECTORS, BACKUP
+          ?C_IMUL . . . . . . CODE    [MULS]:  CFILE
+          ?C_IMULX  . . . . . CODE    [MULS]: 
+          ?C_INDCALL  . . . . CODE    [_C_INDCL]:  TERMIOTICK, SETTERMIOVECTORS, SETSERIALMODE, GETSERIALMODE, GETRXCHARS, GETCH
+          ?C_INITSEGSTART . . CODE    [_C_INITD]:  INITSTATIC
+          ?C_LADD . . . . . . CODE    [LADD]:  BACKUP
+          ?C_LOP  . . . . . . CODE    [COML]:  LADD
+          ?C_MEMCPY . . . . . CODE    [MEMCPY]: 
+          ?C_SIDIV  . . . . . CODE    [DIVS]:  CFILE
+          ?C_START0 . . . . . CODE    [STARTUP]:  MAIN
+          ?C_UIDIV  . . . . . CODE    [DIVS]: 
+          ?memcmp . . . . . . CODE    [MEMCMP]:  RTCLOCK
+          ?memcpy . . . . . . CODE    [MEMCPY]:  RTCLOCK
+          ?printf1  . . . . . CODE    [PRINT1]:  CFILE
+          ?SfrPLC_InputAcq  . CODE    [INPUTACQ]:  MAIN
+          ?SfrPLC_OutputMng . CODE    [OUTPUTMNG]:  MAIN
+          ?sprintf1 . . . . . CODE    [PRINT1]: 
+          ?strcmp . . . . . . CODE    [STRCMP]: 
+          ?strcpy . . . . . . CODE    [STRCPY]:  SYSTEM
+          ?_ArrayBitSet?BYTE  XDATA   [KERNELVARS]: 
+          ?_Linearize?BYTE  . XDATA   [KERNELVARS]: 
+          ?_NSYSTExtReadVar?BYXDATA   [KERNELVARS]: 
+          ?_NSYSTExtWriteVar?BXDATA   [KERNELVARS]: 
+          ?_SystemMemoryRead?BXDATA   [KERNELVARS]:  BACKUP
+          ?_SystemMemoryWrite?XDATA   [KERNELVARS]:  BACKUP
+          BackToKernel  . . . CODE    [KERNELFCTS]:  STARTUP
+          BankCall  . . . . . CODE    [BANKSWITCH]:  STARTUP
+          BankSwitch  . . . . CODE    [KERNELFCTS]:  BANKSWITCH
+          comfortP0 . . . . . XDATA   [CFILE]: 
+          comfortP1 . . . . . XDATA   [CFILE]: 
+          CPL_R4R5  . . . . . CODE    [DIVS]: 
+          CPL_R6R7  . . . . . CODE    [DIVS]: 
+          CustomFunction  . . CODE    [CFILE]:  RILFILE
+          DeviceIsOpen?TERMIO?CODE    [TERMIO]:  TERMIO
+          DI  . . . . . . . . XDATA   [CFILE]: 
+          DIV_2 . . . . . . . CODE    [DIVS]: 
+          DO  . . . . . . . . XDATA   [CFILE]: 
+          EEPROMWriteCtr  . . XDATA   [KERNELVARS]: 
+          ElSystemLibVersion  CODE    [SFR043B300]:  SYSTEM
+          ExecutionErrors . . XDATA   [KERNELVARS]: 
+          FLASHWriteCtr . . . XDATA   [KERNELVARS]: 
+          GetCh . . . . . . . CODE    [GETCH]:  CFILE
+          getchar . . . . . . CODE    [GETCHAR]:  STARTUP
+          GetCharEchoEnable . BIT     [TERMIO]:  GETCHAR
+          GetClockIntTime . . CODE    [KERNELFCTS]: 
+          GetRxChars  . . . . CODE    [GETRXCHARS]:  CFILE
+          GetSystemTime . . . CODE    [KERNELFCTS]:  COMMONC, BACKUP
+          GetWDogTime . . . . CODE    [KERNELFCTS]: 
+          HwWDogRefresh . . . CODE    [KERNELFCTS]: 
+          IODeviceFctMissing  CODE    [TERMIO]:  SERIALFCTS0
+          IODeviceFctNotCorrecCODE    [TERMIO]:  TERMIO
+          IODeviceFctReturn . CODE    [TERMIO]:  SERIALFCTS0
+          IODeviceNotCorrect  XDATA   [TERMIO]:  SETTERMIOVECTORS
+          IOSerialPortA . . . XDATA   [SERIALFCTS0]:  CFILE
+          IPGN0?C . . . . . . CODE    [IPGN0]:  IPGN0_INC
+          IPGN0INC?C  . . . . CODE    [IPGN0_INC]:  PRINT1
+          KernelErrors  . . . XDATA   [KERNELVARS]: 
+          KernelGoProgram . . CODE    [KERNELFCTS]: 
+          KernelVersion . . . XDATA   [KERNELVARS]: 
+          KrnX_GetCh  . . . . CODE    [KERNELFCTS]:  SERIALFCTS0
+          KrnX_GetCursorColumnCODE    [KERNELFCTS]: 
+          KrnX_GetCursorRow . CODE    [KERNELFCTS]: 
+          KrnX_GetRxChars . . CODE    [KERNELFCTS]:  SERIALFCTS0
+          KrnX_GetTermIOData  CODE    [KERNELFCTS]:  SERIALFCTS0
+          KrnX_GetTxSpace . . CODE    [KERNELFCTS]:  SERIALFCTS0
+          KrnX_TermIOClose  . CODE    [KERNELFCTS]:  SERIALFCTS0
+          KrnX_TermIOIsOpen . CODE    [KERNELFCTS]:  SERIALFCTS0
+          KrnX_TermIOOpen . . CODE    [KERNELFCTS]:  SERIALFCTS0
+          KrnX_TermIORxClear  CODE    [KERNELFCTS]:  SERIALFCTS0
+          KrnX_TermIORxFlush  CODE    [KERNELFCTS]: 
+          KrnX_TermIOTick . . CODE    [KERNELFCTS]:  SERIALFCTS0
+          KrnX_TermIOTxClear  CODE    [KERNELFCTS]:  SERIALFCTS0
+          KrnX_TermIOTxFlush  CODE    [KERNELFCTS]: 
+          Main  . . . . . . . CODE    [MAIN]:  STARTUP
+          ManageHeatingOutputsCODE    [CFILE]:  CFILE
+          MV4_RG2XD?C . . . . CODE    [MV_RG2XD4]:  BACKUP
+          MV4_XD2RG?C . . . . CODE    [MV_XD2RG4]:  BACKUP
+          MV4_XD2SN?C . . . . CODE    [MV_XD2SN4]:  BACKUP
+          NSYSTBusRetries . . XDATA   [KERNELVARS]: 
+          NSYSTExtModuleNumberCODE    [KERNELFCTS]: 
+          NSYSTReadyIn  . . . CODE    [KERNELFCTS]: 
+          openvalves  . . . . XDATA   [CFILE]: 
+          ParseCOM  . . . . . CODE    [CFILE]:  CFILE
+          PLCBackupDataArea . XDATA   [PLCRILDECLARATION]: 
+          PLCBackupDisable  . XDATA   [COMMONC]:  BACKUP
+          PLCBackupEnd  . . . XDATA   [COMMONC]:  BACKUP
+          PLCBackupHeader . . XDATA   [PLCRILDECLARATION]: 
+          PLCBackupOneShot  . XDATA   [COMMONC]:  BACKUP
+          PLCChrReceived  . . XDATA   [COMMONC]: 
+          PLCClock100 . . . . XDATA   [COMMONC]: 
+          PLCClock1000  . . . XDATA   [COMMONC]: 
+          PLCClock500 . . . . XDATA   [COMMONC]: 
+          PLCConvError  . . . XDATA   [COMMONC]: 
+          PLCEquFlag  . . . . XDATA   [COMMONC]: 
+          PLCErrors . . . . . XDATA   [COMMONC]:  BACKUP
+          PLCFirstLoop  . . . XDATA   [COMMONC]:  RTCLOCK, INPUTACQ, BACKUP, CFILE
+          PLCGrtFlag  . . . . XDATA   [COMMONC]: 
+          PLCLesFlag  . . . . XDATA   [COMMONC]: 
+          PLCLogicInputDebouncXDATA   [PLCRILDECLARATION]:  INPUTACQ
+          PLCLogicInputDebouncXDATA   [PLCRILDECLARATION]:  INPUTACQ
+          PLCLoopTime . . . . XDATA   [COMMONC]:  INPUTACQ
+          PLCLoopToggle . . . XDATA   [COMMONC]: 
+          PLCMathError  . . . XDATA   [COMMONC]: 
+          PLCMaxLoopTime  . . XDATA   [COMMONC]: 
+          PLCMemoryFlags  . . XDATA   [PLCRILDECLARATION]: 
+          PLCMemoryLogicInputsXDATA   [PLCRILDECLARATION]:  INPUTACQ, CFILE
+          PLCMemoryLogicOutputXDATA   [PLCRILDECLARATION]:  OUTPUTMNG, CFILE
+          PLCMinLoopTime  . . XDATA   [COMMONC]: 
+          PLCPulse100 . . . . XDATA   [COMMONC]: 
+          PLCPulse1000  . . . XDATA   [COMMONC]:  CFILE
+          PLCPulse500 . . . . XDATA   [COMMONC]:  RTCLOCK
+          PLCRandom . . . . . XDATA   [COMMONC]: 
+          PLCRemoterProjectInfCODE    [MAIN]: 
+          PLCRestoreFault . . XDATA   [COMMONC]:  BACKUP
+          PLCRtcData  . . . . XDATA   [PLCRILDECLARATION]:  MAIN
+          PLCRtcDataPtr . . . XDATA   [RTCLOCK]:  MAIN
+          PLCRxBufEmpty . . . XDATA   [COMMONC]: 
+          PLCSubIsNegative  . XDATA   [COMMONC]: 
+          PLCSystemTime . . . XDATA   [COMMONC]: 
+          PLCTimeBase100  . . XDATA   [COMMONC]: 
+          PLCTimeBase12800  . XDATA   [COMMONC]: 
+          PLCTimeBase1600 . . XDATA   [COMMONC]: 
+          PLCTimeBase200  . . XDATA   [COMMONC]: 
+          PLCTimeBase3200 . . XDATA   [COMMONC]: 
+          PLCTimeBase400  . . XDATA   [COMMONC]: 
+          PLCTimeBase6400 . . XDATA   [COMMONC]: 
+          PLCTimeBase800  . . XDATA   [COMMONC]: 
+          PLCTxBufEmpty . . . XDATA   [COMMONC]: 
+          PLCTxBufFull  . . . XDATA   [COMMONC]: 
+          PLC_F_1 . . . . . . NUMBER  [RILFILE]: 
+          PLC_I_0 . . . . . . NUMBER  [RILFILE]: 
+          PLC_I_1 . . . . . . NUMBER  [RILFILE]: 
+          PLC_I_10  . . . . . NUMBER  [RILFILE]: 
+          PLC_I_11  . . . . . NUMBER  [RILFILE]: 
+          PLC_I_12  . . . . . NUMBER  [RILFILE]: 
+          PLC_I_13  . . . . . NUMBER  [RILFILE]: 
+          PLC_I_14  . . . . . NUMBER  [RILFILE]: 
+          PLC_I_15  . . . . . NUMBER  [RILFILE]: 
+          PLC_I_2 . . . . . . NUMBER  [RILFILE]: 
+          PLC_I_3 . . . . . . NUMBER  [RILFILE]: 
+          PLC_I_4 . . . . . . NUMBER  [RILFILE]: 
+          PLC_I_5 . . . . . . NUMBER  [RILFILE]: 
+          PLC_I_6 . . . . . . NUMBER  [RILFILE]: 
+          PLC_I_7 . . . . . . NUMBER  [RILFILE]: 
+          PLC_I_8 . . . . . . NUMBER  [RILFILE]: 
+          PLC_I_9 . . . . . . NUMBER  [RILFILE]: 
+          PLC_L_ElPLCLib  . . CODE    [ELPLCLIB]:  MAIN
+          PLC_L_RilFile . . . CODE    [RILFILE]:  MAIN
+          PLC_O_0 . . . . . . NUMBER  [RILFILE]: 
+          PLC_O_1 . . . . . . NUMBER  [RILFILE]: 
+          PLC_O_2 . . . . . . NUMBER  [RILFILE]: 
+          PLC_O_3 . . . . . . NUMBER  [RILFILE]: 
+          PLC_O_4 . . . . . . NUMBER  [RILFILE]: 
+          PLC_O_5 . . . . . . NUMBER  [RILFILE]: 
+          PLC_O_6 . . . . . . NUMBER  [RILFILE]: 
+          PLC_O_7 . . . . . . NUMBER  [RILFILE]: 
+          PreviousStatus  . . XDATA   [CFILE]: 
+          Random  . . . . . . CODE    [KERNELFCTS]:  COMMONC
+          RST_STK4?C  . . . . CODE    [RSTSTK4]:  LADD
+          RtcData . . . . . . XDATA   [CFILE]: 
+          RtcONTime . . . . . XDATA   [CFILE]: 
+          RtcPLCSTARTTime . . XDATA   [CFILE]: 
+          RtcTimeNow  . . . . XDATA   [CFILE]: 
+          SetVectors?SERIALFCTCODE    [SERIALFCTS0]:  SERIALFCTS0
+          SfrPLC_AccA . . . . DATA    [COMMONC]: 
+          SfrPLC_AccB . . . . DATA    [COMMONC]: 
+          SfrPLC_AlwaysOne  . CODE    [COMMONC]: 
+          SfrPLC_AlwaysZero . CODE    [COMMONC]: 
+          SfrPLC_CodeControl  CODE    [COMMONC]: 
+          SfrPLC_ProgramBegin CODE    [COMMONC]:  MAIN
+          SfrPLC_ProgramEnd . CODE    [COMMONC]:  MAIN
+          SfrPLC_RTClock  . . CODE    [RTCLOCK]:  MAIN
+          SfrPLC_StartUp  . . CODE    [COMMONC]:  MAIN
+          SfrSys_GetChVector  DATA    [TERMIO]:  GETCHAR, SETTERMIOVECTORS, GETCH
+          SfrSys_InitStatic . CODE    [INITSTATIC]:  STARTUP
+          SfrSys_KrnData  . . XDATA   [KERNELVARS]:  SYSTEM
+          SfrSys_PutChVector  DATA    [TERMIO]:  PUTCHAR, GETCHAR, SETTERMIOVECTORS
+          SfrSys_SystemStartUpCODE    [SYSTEM]:  STARTUP
+          SfrSys_TermIOFcts . DATA    [TERMIO]:  TERMIOTICK, SETTERMIOVECTORS, SETSERIALMODE, GETSERIALMODE, GETRXCHARS
+          SfrSys_TermIOVcts . XDATA   [TERMIO]:  SETTERMIOVECTORS
+          StatMinutiON  . . . XDATA   [CFILE]: 
+          SystemConfig  . . . XDATA   [KERNELVARS]:  BACKUP, MAIN
+          SystemErrors  . . . XDATA   [KERNELVARS]:  TERMIO, SETSERIALMODE, GETSERIALMODE
+          TermIOTick  . . . . CODE    [TERMIOTICK]:  CFILE
+          TotMinutiON . . . . XDATA   [CFILE]: 
+          TotOreON  . . . . . XDATA   [CFILE]: 
+          UserPrgConfig . . . CODE    [KERNELFCTS]: 
+          UserProgramStartUp  CODE    [KERNELFCTS]:  COMMONC
+          WDogRefresh . . . . CODE    [KERNELFCTS]:  COMMONC, BACKUP
+          XD2XD4?C  . . . . . CODE    [XD2XD4]:  BACKUP
+          XPGN0?C . . . . . . CODE    [XPGN0]:  XPGN0_INC
+          XPGN0INC?C  . . . . CODE    [XPGN0_INC]:  PRINT1
+          XPGN1?C . . . . . . CODE    [XPGN1]:  XPGN1_INC
+          XPGN1INC?C  . . . . CODE    [XPGN1_INC]:  PRINT1
+          _ArrayBitCount  . . CODE    [KERNELFCTS]: 
+          _ArrayBitSet  . . . CODE    [KERNELFCTS]: 
+          _ArrayBitStatus . . CODE    [KERNELFCTS]: 
+          _AsciiStringConvert CODE    [KERNELFCTS]: 
+          _BlinkBit . . . . . CODE    [KERNELFCTS]: 
+          _CANInit  . . . . . CODE    [KERNELFCTS]: 
+          _CANRx  . . . . . . CODE    [KERNELFCTS]: 
+          _CANTx  . . . . . . CODE    [KERNELFCTS]: 
+          _ExecuteCmd . . . . CODE    [CFILE]:  CFILE
+          _GetRtc . . . . . . CODE    [KERNELFCTS]:  RTCLOCK, CFILE
+          _GetSerialMode  . . CODE    [GETSERIALMODE]:  CFILE
+          _I2CMasterNodeCheck CODE    [KERNELFCTS]: 
+          _I2CMasterRead  . . CODE    [KERNELFCTS]: 
+          _I2CMasterWrite . . CODE    [KERNELFCTS]: 
+          _IsMsecTimeOver . . CODE    [KERNELFCTS]:  BACKUP
+          _IsSecTimeOver  . . CODE    [KERNELFCTS]: 
+          _KrnX_DisplayClear  CODE    [KERNELFCTS]: 
+          _KrnX_GetSerialMode CODE    [KERNELFCTS]:  SERIALFCTS0
+          _KrnX_InputStream . CODE    [KERNELFCTS]:  SERIALFCTS0
+          _KrnX_OutputStream  CODE    [KERNELFCTS]:  SERIALFCTS0
+          _KrnX_PutCh . . . . CODE    [KERNELFCTS]:  SERIALFCTS0
+          _KrnX_SerialDTRMng  CODE    [KERNELFCTS]:  SERIALFCTS0
+          _KrnX_SetCursorPos  CODE    [KERNELFCTS]: 
+          _KrnX_SetSerialMode CODE    [KERNELFCTS]:  SERIALFCTS0
+          _KrnX_SetTermIOData CODE    [KERNELFCTS]:  SERIALFCTS0
+          _KrnX_SetTermIOVectoCODE    [KERNELFCTS]:  SERIALFCTS0
+          _Linearize  . . . . CODE    [KERNELFCTS]: 
+          _MemCrc . . . . . . CODE    [KERNELFCTS]:  BACKUP
+          _ModbusCrc  . . . . CODE    [KERNELFCTS]: 
+          _MV_XD2SN_0 . . . . CODE    [MV_XD2SN4]: 
+          _NSYSTExtModuleAbortCODE    [KERNELFCTS]: 
+          _NSYSTExtModuleInp  CODE    [KERNELFCTS]: 
+          _NSYSTExtModuleOut  CODE    [KERNELFCTS]: 
+          _NSYSTExtReadVar  . CODE    [KERNELFCTS]: 
+          _NSYSTExtWriteVar . CODE    [KERNELFCTS]: 
+          _NSYSTReadyMng  . . CODE    [KERNELFCTS]: 
+          _PeripheralInp  . . CODE    [KERNELFCTS]:  INPUTACQ
+          _PeripheralOut  . . CODE    [KERNELFCTS]:  OUTPUTMNG
+          _PSYSTReadyMng  . . CODE    [KERNELFCTS]: 
+          _putchar  . . . . . CODE    [PUTCHAR]:  PRINT1, STARTUP
+          _RunLEDMng  . . . . CODE    [KERNELFCTS]: 
+          _SetClockIntTime  . CODE    [KERNELFCTS]: 
+          _SetClockIntVector  CODE    [KERNELFCTS]: 
+          _SetEIntVector  . . CODE    [KERNELFCTS]: 
+          _SetKernelData  . . CODE    [KERNELFCTS]:  SYSTEM
+          _SetPeripheralReady CODE    [KERNELFCTS]: 
+          _SetPWDIntVector  . CODE    [KERNELFCTS]: 
+          _SetRtc . . . . . . CODE    [KERNELFCTS]:  RTCLOCK, CFILE
+          _SetSerialMode  . . CODE    [SETSERIALMODE]:  CFILE
+          _SetSystemPar . . . CODE    [KERNELFCTS]:  COMMONC
+          _SetTermIOVectors . CODE    [SETTERMIOVECTORS]:  CFILE
+          _SetTimerEnable . . CODE    [KERNELFCTS]: 
+          _SetTimerIntVector  CODE    [KERNELFCTS]: 
+          _SetUserDataLock  . CODE    [KERNELFCTS]:  STARTUP
+          _SetWDogTime  . . . CODE    [KERNELFCTS]: 
+          _SfrPLC_ProgramBackuCODE    [BACKUP]:  MAIN
+          _SfrPLC_ProgramRestoCODE    [BACKUP]:  MAIN
+          _STACK  . . . . . . IDATA   [ELPLCLIB]:  STARTUP
+          _SystemMemoryRead . CODE    [KERNELFCTS]:  BACKUP
+          _SystemMemoryWrite  CODE    [KERNELFCTS]:  BACKUP
+          __LOCAL_END__ . . . CODE    [SHARING]:  STRCPY
+          __NULL_POINTER__  . CODE    [SHARING]:  STRCPY
+          __PGN0_INC__  . . . CODE    [PGN0_INC]:  IPGN0_INC, XPGN0_INC
+          __PGN1_INC__  . . . CODE    [PGN1_INC]:  XPGN1_INC
+          __STRCMP_NXT1__ . . CODE    [STRCMP]:  MEMCMP
+          __STRCPY_NXT1__ . . CODE    [STRCPY]:  MEMCPY
