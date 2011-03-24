@@ -30,6 +30,10 @@ $INCLUDE (C:\Program Files\Elsist\Remoter\Lib\Raisonance\Sfr036e000\ElPLCLib.inc
     PUBLIC PLC_I_14
     PUBLIC PLC_I_15
     PUBLIC PLC_F_1
+    EXTRN XDATA(PLC_DW_P0ZonaUnica)
+    EXTRN XDATA(PLC_DW_P1ZonaBagni)
+    EXTRN XDATA(PLC_DW_P1ZonaGiorno)
+    EXTRN XDATA(PLC_DW_P1ZonaNotte)
     EXTRN CODE(CustomFunction)
 
 PLCMemoryLogicInputs SET (05000h)
@@ -67,68 +71,76 @@ PLC_F_1 EQU PLCMemoryFlags+01h
 
 PLC_L_RilFile:
 
-; Line    11 SVIW O 0
+; Line    12 SVIW O 0
 
-; Line    12 SVIW O 1
+; Line    13 SVIW O 1
 
-; Line    13 SVIW O 2
+; Line    14 SVIW O 2
 
-; Line    14 SVIW O 3
+; Line    15 SVIW O 3
 
-; Line    15 SVIW O 4
+; Line    16 SVIW O 4
 
-; Line    16 SVIW O 5
+; Line    17 SVIW O 5
 
-; Line    17 SVIW O 6
+; Line    18 SVIW O 6
 
-; Line    18 SVIW O 7
+; Line    19 SVIW O 7
 
-; Line    19 SVIW I 0
+; Line    20 SVIW I 0
 
-; Line    20 SVIW I 1
+; Line    21 SVIW I 1
 
-; Line    21 SVIW I 2
+; Line    22 SVIW I 2
 
-; Line    22 SVIW I 3
+; Line    23 SVIW I 3
 
-; Line    23 SVIW I 4
+; Line    24 SVIW I 4
 
-; Line    24 SVIW I 5
+; Line    25 SVIW I 5
 
-; Line    25 SVIW I 6
+; Line    26 SVIW I 6
 
-; Line    26 SVIW I 7
+; Line    27 SVIW I 7
 
-; Line    27 SVIW I 8
+; Line    28 SVIW I 8
 
-; Line    28 SVIW I 9
+; Line    29 SVIW I 9
 
-; Line    29 SVIW I 10
+; Line    30 SVIW I 10
 
-; Line    30 SVIW I 11
+; Line    31 SVIW I 11
 
-; Line    31 SVIW I 12
+; Line    32 SVIW I 12
 
-; Line    32 SVIW I 13
+; Line    33 SVIW I 13
 
-; Line    33 SVIW I 14
+; Line    34 SVIW I 14
 
-; Line    34 SVIW I 15
+; Line    35 SVIW I 15
 
-; Line    36 ORGR
+; Line    37 ORGR
 
-; Line    37 LODF F 1
+; Line    38 LODF F 1
     mov   dptr,#PLC_F_1+0
     movx  a,@dptr
     cpl   a
 
-; Line    38 TASK L CustomFunction
+; Line    39 TASK L CustomFunction
     anl   a,#001h
     jz    Lbl$_0
     push  acc
     lcall CustomFunction
     pop   acc
 Lbl$_0:
+
+; Line    43 DEFB DW P1ZonaNotte
+
+; Line    44 DEFB DW P1ZonaGiorno
+
+; Line    45 DEFB DW P1ZonaBagni
+
+; Line    46 DEFB DW P0ZonaUnica
     ret
 
     END

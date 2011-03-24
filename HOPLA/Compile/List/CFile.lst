@@ -1,4 +1,4 @@
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:41  PAGE  1
+RC51 COMPILER V03.03.37,  CFILE                  03/17/11  19:16:41  PAGE  1
 
 QCW(0x0002AE52)
 
@@ -43,2663 +43,716 @@ stmt level    source
   31          |              |       | Ottimizzazione dimensione codice oggetto     |        |
   32          |  27/2/11 wip | 0.7.1 | Aggiunta statistiche giornaliere per un anno |   IB   |
   33          |              |       | Risolto b3                                   |        |
-  34          +--------------+-------+----------------------------------------------+-------*/
-  35          
-  36          //buglist
-  37          // 0.4.0: b1 non sempre risponde ai comandi via seriali, alcune volte bisogna ripeterli 3-4 volte prima di avere rispo
+  34          |  6/3/11 run  | 0.7.2 | Nuovo parser                                 |   IB   |
+  35          |  16/3/11 wip | 0.8.0 | Retain configuration vector                  |   IB   |
+  36          |              |       |                                   |        |
+  37          +--------------+-------+----------------------------------------------+-------*/
+  38          
+  39          //buglist
+  40          // 0.4.0: b1 non sempre risponde ai comandi via seriali, alcune volte bisogna ripeterli 3-4 volte prima di avere rispo
             -sta. Risolto in 0.5.0
-  38          // 0.4.0: b2 non parte mai la caldaia !!! Risolto in 0.4.1
-  39          // 0.7.0: b3 errore calcolo minuti al cambio giorno
-  40          // 0.7.0: b4 manca possibilita' di settare il giorno del rtc
-  41          
-  42          // -----------------------------------------------------------------------------
-  43          // FILE INCLUSIONS
-  44          // -----------------------------------------------------------------------------
-  45          #include <stdio.h>
-  46          #include <ElSystemLib.h>
-  47          #include <ElPLCLib.h>
-  48          
-  49          #define TERMOSTATOP1CORR 0
-  50          #define TERMOSTATOP0 1
-  51          #define TERMOSTATOP1PAOLO 2
-  52          #define TERMOSTATOP1GIORNO 3
+  41          // 0.4.0: b2 non parte mai la caldaia !!! Risolto in 0.4.1
+  42          // 0.7.0: b3 errore calcolo minuti al cambio giorno
+  43          // 0.7.0: b4 manca possibilita' di settare il giorno del rtc
+  44          
+  45          // -----------------------------------------------------------------------------
+  46          // FILE INCLUSIONS ANSI-C ed ELSIST
+  47          // -----------------------------------------------------------------------------
+  48          #include <stdio.h>
+  49          #include <string.h>
+  50          #include <ctype.h>
+  51          #include <ElSystemLib.h>
+  52          #include <ElPLCLib.h>
   53          
-  54          #define HEATER_ON 0
-  55          #define ZONA1N 4
-  56          #define ZONA1G 5
-  57          #define ZONA1B 6
-  58          #define ZONAP0 7
-  59          
-  60          /** Logic boolean value  */
-  61          /* False is 0, not zero is true                      */
-  62          //typedef char Logic;
-  63          
-  64          #ifndef TRUE
-                #define TRUE 1
-              #endif
+  54          // -----------------------------------------------------------------------------
+  55          // Le define corrispondono alle connessioni su morsettiere
+  56          // -----------------------------------------------------------------------------
+  57          #define TERMOSTATOP1CORR 0
+  58          #define TERMOSTATOP0 1
+  59          #define TERMOSTATOP1PAOLO 2
+  60          #define TERMOSTATOP1GIORNO 3
+  61          #define HEATER_ON 0
+  62          #define ZONA1N 4
+  63          #define ZONA1G 5
+  64          #define ZONA1B 6
+  65          #define ZONAP0 7
+  66          
   67          
-  68          #ifndef FALSE
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE  2
+  68          // -----------------------------------------------------------------------------
+RC51 COMPILER V03.03.37,  CFILE                  03/17/11  19:16:42  PAGE  2
 
-                #define FALSE 0
-              #endif
-  71          
-  72          #define MAXDI 16
-  73          #define MAXDO 8
-  74          
-  75          // -----------------------------------------------------------------------------
-  76          // debug mode and variable declarations
-  77          // -----------------------------------------------------------------------------
-  78          //#define DBG_LEVEL
-  79          #ifdef DBG_LEVEL
+  69          // debug. Togliere i commenti dalle define per attivare i debug su COM 
+  70          // -----------------------------------------------------------------------------
+  71          //#define DBG_LEVEL
+  72          #ifdef DBG_LEVEL
                   char dbg1;
                   char dbg2;
               #endif
-  83          
-  84          // -----------------------------------------------------------------------------
-  85          // global variable declarations
-  86          // -----------------------------------------------------------------------------
-  87          
-  88          BOOL DI[MAXDI]={
-  89          0, // TERMOSTATOP1CORR 0
-  90          0, // TERMOSTATOP0 1
-  91          0, // TERMOSTATOP1PAOLO2  stanza paolo
-  92          0, //TEMOSTATOP1GIORNO
-  93          0,0,0,0,0,0,0,0,0,0,0,0 };
-  94          
-  95          BOOL DO[MAXDO]={
-  96          0, //HEATER_ON 0
-  97          0,0,0,
-  98          0, // ZONA1N 4
-  99          0, // ZONA1G 5
- 100          0, // ZONA1B 6
- 101          0 // ZONAP0 7
- 102          };
- 103          
- 104          static int nextaction=0;
- 105          int openvalves=0;
- 106          //int antiicing;
- 107          RTCDATA RtcData; //Rtc data structure
- 108          
- 109          // @Section("Custom Function - 0.7.0")  Misura tempo di accensione
- 110          RTCDATA RtcPLCSTARTTime,RtcONTime, RtcTimeNow; //Rtc data structure
- 111          unsigned int PreviousStatus, TotMinutiON, TotOreON;
- 112          // @Section("Custom Function - 0.7.1")  statistiche
- 113          unsigned int StatMinutiON[12][31];
- 114          
+  76          //#define DBG_PARSECOM
+  77          
+  78          // -----------------------------------------------------------------------------
+  79          // global variable declarations
+  80          // -----------------------------------------------------------------------------
+  81          
+  82          // Max in/out del modulo
+  83          #define MAXDI 16
+  84          #define MAXDO 8
+  85          
+  86          BOOL DI[MAXDI]={
+  87          0, // TERMOSTATOP1CORR 0
+  88          0, // TERMOSTATOP0 1
+  89          0, // TERMOSTATOP1PAOLO2  stanza paolo
+  90          0, //TEMOSTATOP1GIORNO
+  91          0,0,0,0,0,0,0,0,0,0,0,0 };
+  92          
+  93          BOOL DO[MAXDO]={
+  94          0, //HEATER_ON 0
+  95          0,0,0,
+  96          0, // ZONA1N 4
+  97          0, // ZONA1G 5
+  98          0, // ZONA1B 6
+  99          0 // ZONAP0 7
+ 100          };
+ 101          
+ 102          static int nextaction=0;
+ 103          int openvalves=0;
+ 104          RTCDATA RtcData; //Rtc data structure
+ 105          
+ 106          // @Section("Custom Function - 0.7.0")  Misura tempo di accensione
+ 107          RTCDATA RtcPLCSTARTTime,RtcONTime, RtcTimeNow; //Rtc data structure
+ 108          unsigned int PreviousStatus, TotMinutiON, TotOreON;
+ 109          // @Section("Custom Function - 0.7.1")  statistiche
+ 110          unsigned int StatMinutiON[12][31];
+ 111          
+ 112          // @Section("Custom Function - 0.7.2")  nuovo parsecom
+ 113          // -----------------------------------------------------------------------------
+ 114          // PARSECOM PROTOTYPE
  115          // -----------------------------------------------------------------------------
- 116          // HEATING ZONES CONFIGURATION
- 117          // -----------------------------------------------------------------------------
- 118          
- 119          
- 120          // B=bathroom
- 121          // X = all off
- 122          // N= zona notte + corridoi + bagni
- 123          // G= zona giorno + corridoi + bagni
- 124          // A= All ON
- 125          
- 126          char comfortP0[24]={
- 127          'A','A','A','A','A','A',
- 128          'A','A','A','A','A','A',
- 129          'A','A','A','A','A','A',
- 130          'A','A','A','A','A','A' }; 
- 131           
- 132          char comfortP1[24]={
- 133          'X', // dalle 00:00 alle 00:59 -> tutto spento
- 134          'X','X','X','X','X',// dalle 1:00 alle 5:59 -> tutto spento 
- 135          'B', // dalle 6:00 alle 6:59 -> zona bagni
- 136          'A', // dalle 7:00 alle 7:59 -> tutto acceso 
- 137          'G','G','G','G','G', // dalle 8:00 alle 12:59 -> Bagni + Zona Giorno + Corridoi
- 138          'A','A', // tutto acceso dalle 13:00 alle 14:59
- 139          'G','G','G','G','G', // dalle 15:00 alle 19:59 -> Bagni + Zona Giorno 
- 140          'A','A','A',// dalle 20:00 alle 22:59 -> tutto acceso
- 141          'N' }; // dalle 23:00 alle 23:59 -> zona notte+corridoi+bagni 
+ 116          char ParseCOM2(char *argcnt, char *argvect);
+ 117          #define CMDLINEMAXLEN 32
+ 118          // -----------------------------------------------------------------------------
+ 119          // PARSECOM EXTERN VARIABLES
+ 120          // -----------------------------------------------------------------------------
+ 121          static char chptr=0;
+ 122          static char argcnt;
+ 123          static char argvect[6];
+ 124          static char cmdline[32];
+ 125          struct cmd_descr {
+ 126              char cmd[10];
+ 127              char argnum;
+ 128          } commandlist[]= { {"nop", 0 }, {"status", 0}, {"timeset", 2}, {"timeread",0},
+ 129              {"dataset", 3},{"dataread",0} , {"reset",0} };
+ 130          #define NUMCOMANDI 7
+ 131          
+ 132          // @Section("8.0.0 - Retain confort vector")
+ 133          extern unsigned long ZonaNotte;
+ 134          extern unsigned long ZonaGiorno;
+ 135          extern unsigned long ZonaBagni;
+ 136          extern unsigned long P0ZonaUnica;
+ 137          
+ 138          // -----------------------------------------------------------------------------
+ 139          // HEATING ZONES CONFIGURATION
+ 140          // -----------------------------------------------------------------------------
+ 141          
  142          
- 143          
- 144          // function prototipes
- 145          //void   ManageHeatingInputs(void);
- 146          void   ManageHeatingOutputs(void);         
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE  3
+ 143          // B=bathroom
+ 144          // X = all off
+ 145          // N= zona notte + corridoi + bagni
+ 146          // G= zona giorno + corridoi + bagni
+RC51 COMPILER V03.03.37,  CFILE                  03/17/11  19:16:42  PAGE  3
 
- 147          void ParseCOM(void);
- 148          char ExecuteCmd(unsigned char , unsigned char );
- 149          // -----------------------------------------------------------------------------
- 150          // CUSTOM FUNCTION
- 151          // -----------------------------------------------------------------------------
- 152          
- 153          // @Section("Custom Function - C Entry point")
- 154          void CustomFunction(void)
- 155          {
- 156   1      SERIALSTRUCT SerialStruct; //Serial parameters
- 157   1      int i,j;
- 158   1      
- 159   1          if (PLCFirstLoop)
- 160   1          {
- 161   2      
- 162   2       // Enable the serial communication on serial port "" and define parameters.
- 163   2       // Set serial at 19200, e, 8. DTR automatically managed without any time
- 164   2              SetTermIOVectors(IOSerialPortA); //Set the serial port A as I/O console
- 165   2              GetSerialMode(&SerialStruct); //Get communication mode
- 166   2              SerialStruct.Mode.DTRComplement=FALSE; //Complement the DTR signal
- 167   2              SerialStruct.Mode.EchoFlush=FALSE; //Flush the echo
- 168   2              SerialStruct.Mode.RxCtrlDisable=TRUE; //Disable Rx control characters
- 169   2              SerialStruct.Mode.DTRManagement=2; //Define the DTR management
- 170   2              SerialStruct.Mode.WaitLoop=FALSE; //FALSE:No wait, TRUE:Wait
- 171   2              SerialStruct.Mode.ParityEnabled=TRUE; //Enables the parity management
- 172   2              SerialStruct.Mode.ParityType=TRUE; //FALSE:Odd parity, TRUE:Even parity
- 173   2              SerialStruct.Mode.BitNumber=TRUE; //FALSE:7 bit, TRUE:8 bit
- 174   2              SerialStruct.Mode.WaitLoop=FALSE; //FALSE:No wait, TRUE:Wait
- 175   2              SerialStruct.Mode.Baud=6; //Baud rate
- 176   2              SerialStruct.DTROnTime=0; //DTR On wait time
- 177   2              SerialStruct.DTROffTime=0; //DTR Off delay time
- 178   2              SetSerialMode(&SerialStruct); //Set communication mode
- 179   2      
- 180   2              // @Section("Custom Function - 0.7.0")  misura tempo di accensione
- 181   2              PreviousStatus = 0;
- 182   2              TotMinutiON=TotOreON=0;
- 183   2              GetRtc (&RtcPLCSTARTTime);
- 184   2             // @Section("Custom Function - 0.7.1")  statistiche
- 185   2              for (i=0;i<12;i++)
- 186   2                  for (j=0;j<31;j++)
- 187   2                      StatMinutiON[i][j]=0; 
- 188   2      
- 189   2      #ifdef DBG_LEVEL
+ 147          // A= All ON\
+ 148          //                                          22221111111111
+ 149          //                                          321098765432109876543210          
+ 150          unsigned long defaultZonaNotte=   0b00000000111100000110000010000000;
+ 151          unsigned long defaultZonaGiorno=  0b00000000011111111111111110000000;
+ 152          unsigned long defaultZonaBagni=   0b00000000011111111111111111000000;
+ 153          unsigned long defaultP0ZonaUnica= 0b00000000111111111111111111111111;
+ 154          
+ 155          da fare:
+
+*** ERROR C162 IN LINE 155 OF C:\Documents and Settings\ib\My Documents\RemoterApplications\HOPLA\CFile.c : Syntax error near 'fare
+            -'
+ 156          1- comando per caricare default nei vettori confort
+
+*** ERROR C074 IN LINE 156 OF C:\Documents and Settings\ib\My Documents\RemoterApplications\HOPLA\CFile.c : Invalid declaration syn
+            -tax
+ 157          2- cambiare la logica di accensione output utilizzando i vettori retain
+
+*** ERROR C056 IN LINE 157 OF C:\Documents and Settings\ib\My Documents\RemoterApplications\HOPLA\CFile.c : Syntax error
+
+*** ERROR C074 IN LINE 156 OF C:\Documents and Settings\ib\My Documents\RemoterApplications\HOPLA\CFile.c : Invalid declaration syn
+            -tax
+
+*** ERROR C074 IN LINE 157 OF C:\Documents and Settings\ib\My Documents\RemoterApplications\HOPLA\CFile.c : Invalid declaration syn
+            -tax
+ 158          3- cambiare i comandi di modifica della programm comfort
+
+*** ERROR C056 IN LINE 158 OF C:\Documents and Settings\ib\My Documents\RemoterApplications\HOPLA\CFile.c : Syntax error
+
+*** ERROR C074 IN LINE 157 OF C:\Documents and Settings\ib\My Documents\RemoterApplications\HOPLA\CFile.c : Invalid declaration syn
+            -tax
+
+*** ERROR C074 IN LINE 158 OF C:\Documents and Settings\ib\My Documents\RemoterApplications\HOPLA\CFile.c : Invalid declaration syn
+            -tax
+ 159          
+ 160          char comfortP0[24]={
+
+*** ERROR C056 IN LINE 160 OF C:\Documents and Settings\ib\My Documents\RemoterApplications\HOPLA\CFile.c : Syntax error
+ 161          'A','A','A','A','A','A',
+ 162          'A','A','A','A','A','A',
+ 163          'A','A','A','A','A','A',
+ 164          'A','A','A','A','A','A' }; 
+ 165          char comfortP1[24]={
+ 166          'X', // dalle 00:00 alle 00:59 -> tutto spento
+ 167          'X','X','X','X','X',// dalle 1:00 alle 5:59 -> tutto spento 
+ 168          'B', // dalle 6:00 alle 6:59 -> zona bagni
+ 169          'A', // dalle 7:00 alle 7:59 -> tutto acceso 
+ 170          'G','G','G','G','G', // dalle 8:00 alle 12:59 -> Bagni + Zona Giorno + Corridoi
+ 171          'A','A', // tutto acceso dalle 13:00 alle 14:59
+ 172          'G','G','G','G','G', // dalle 15:00 alle 19:59 -> Bagni + Zona Giorno 
+ 173          'A','A','A',// dalle 20:00 alle 22:59 -> tutto acceso
+ 174          'N' }; // dalle 23:00 alle 23:59 -> zona notte+corridoi+bagni 
+ 175          
+ 176          
+ 177          // function prototipes
+ 178          //void   ManageHeatingInputs(void);
+ 179          void   ManageHeatingOutputs(void);         
+ 180          
+ 181          char ExecuteCmd(unsigned char , unsigned char );
+ 182          // -----------------------------------------------------------------------------
+ 183          // CUSTOM FUNCTION
+ 184          // -----------------------------------------------------------------------------
+ 185          
+ 186          // @Section("Custom Function - C Entry point")
+ 187          void CustomFunction(void)
+ 188          {
+ 189   1      SERIALSTRUCT SerialStruct; //Serial parameters
+ 190   1      int i,j;
+ 191   1      
+ 192   1          if (PLCFirstLoop)
+ 193   1          {
+ 194   2      
+ 195   2       // Enable the serial communication on serial port "" and define parameters.
+ 196   2       // Set serial at 19200, e, 8. DTR automatically managed without any time
+ 197   2              SetTermIOVectors(IOSerialPortA); //Set the serial port A as I/O console
+ 198   2              GetSerialMode(&SerialStruct); //Get communication mode
+ 199   2              SerialStruct.Mode.DTRComplement=FALSE; //Complement the DTR signal
+ 200   2              SerialStruct.Mode.EchoFlush=FALSE; //Flush the echo
+ 201   2              SerialStruct.Mode.RxCtrlDisable=TRUE; //Disable Rx control characters
+ 202   2              SerialStruct.Mode.DTRManagement=2; //Define the DTR management
+ 203   2              SerialStruct.Mode.WaitLoop=FALSE; //FALSE:No wait, TRUE:Wait
+ 204   2              SerialStruct.Mode.ParityEnabled=TRUE; //Enables the parity management
+ 205   2              SerialStruct.Mode.ParityType=TRUE; //FALSE:Odd parity, TRUE:Even parity
+ 206   2              SerialStruct.Mode.BitNumber=TRUE; //FALSE:7 bit, TRUE:8 bit
+ 207   2              SerialStruct.Mode.WaitLoop=FALSE; //FALSE:No wait, TRUE:Wait
+ 208   2              SerialStruct.Mode.Baud=6; //Baud rate
+ 209   2              SerialStruct.DTROnTime=0; //DTR On wait time
+RC51 COMPILER V03.03.37,  CFILE                  03/17/11  19:16:42  PAGE  4
+
+ 210   2              SerialStruct.DTROffTime=0; //DTR Off delay time
+ 211   2              SetSerialMode(&SerialStruct); //Set communication mode
+ 212   2      
+ 213   2              // @Section("Custom Function - 0.7.0")  misura tempo di accensione
+ 214   2              PreviousStatus = 0;
+ 215   2              TotMinutiON=TotOreON=0;
+ 216   2              GetRtc (&RtcPLCSTARTTime);
+ 217   2             // @Section("Custom Function - 0.7.1")  statistiche
+ 218   2              for (i=0;i<12;i++)
+ 219   2                  for (j=0;j<31;j++)
+ 220   2                      StatMinutiON[i][j]=0; 
+ 221   2      
+ 222   2      #ifdef DBG_LEVEL
        2              printf("first loop/n");
        2              dbg1 = 1; //1 ==> first loop
        2              dbg2 = 1; 
        2      #endif
- 194   2          }
- 195   1      
- 196   1          //cambiato il 20/11/2010 mattina
- 197   1          DI[TERMOSTATOP0] = PLCOpI(TERMOSTATOP0);
- 198   1      	DI[TERMOSTATOP1CORR] = PLCOpI(TERMOSTATOP1CORR);           
- 199   1      	DI[TERMOSTATOP1PAOLO] = PLCOpI(TERMOSTATOP1PAOLO);           
- 200   1      	DI[TERMOSTATOP1GIORNO] = PLCOpI(TERMOSTATOP1GIORNO);
- 201   1           	
- 202   1          // input/outpout via seriale
- 203   1          ParseCOM();
- 204   1      
- 205   1          // Gestione sequenziale degli Input e degli Output e della seriale, con periodo di un secondo
- 206   1          if (PLCPulse1000)
- 207   1          {
- 208   2              if (nextaction==2)
- 209   2                  nextaction=0;
- 210   2      
- 211   2              switch (nextaction)
- 212   2              {
- 213   3                  case 0: //void   ManageHeatingInputs(void);
- 214   3      //cambiato il 20/11/2010 mattina
- 215   3      //		    DI[TERMOSTATOP0] = PLCOpI(TERMOSTATOP0);
- 216   3      //		    DI[TERMOSTATOP1] = PLCOpI(TERMOSTATOP1);           
- 217   3      #ifdef DBG_LEVEL
-       3              if (dbg1 == 1)
-       3              {
-       3                  printf("first loop : case 0. Pass order: %d /n", dbg2);
-       3                  dbg2++;
-       3              }
-       3      #endif
- 224   3      
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE  4
+ 227   2          }
+ 228   1      
+ 229   1          //cambiato il 20/11/2010 mattina
+ 230   1          DI[TERMOSTATOP0] = PLCOpI(TERMOSTATOP0);
+ 231   1      	DI[TERMOSTATOP1CORR] = PLCOpI(TERMOSTATOP1CORR);           
+ 232   1      	DI[TERMOSTATOP1PAOLO] = PLCOpI(TERMOSTATOP1PAOLO);           
+ 233   1      	DI[TERMOSTATOP1GIORNO] = PLCOpI(TERMOSTATOP1GIORNO);
+ 234   1           	
+ 235   1          // input/outpout via seriale
+ 236   1          if ((i=ParseCOM2(&argcnt, argvect))>0)
+ 237   1          {
+ 238   2      #ifdef DBG_PARSECOM
+       2              printf ("funziona:%d\n",i);
+       2      #endif
+ 241   2              if (i==1)
+ 242   2                  ExecuteCmd('S', 0);
+ 243   2              if (i==3)
+ 244   2                  ExecuteCmd('T', 0);
+ 245   2      
+ 246   2              if (i==2)
+ 247   2              {
+ 248   3                  ExecuteCmd('H', argvect[0]);
+ 249   3                  ExecuteCmd('m', argvect[1]);
+ 250   3              }
+ 251   2      
+ 252   2              if (i==4)
+ 253   2              {
+ 254   3                  ExecuteCmd('d', argvect[0]);
+ 255   3                  ExecuteCmd('M', argvect[1]);
+ 256   3                  ExecuteCmd('Y', argvect[2]);
+ 257   3              }
+ 258   2               if (i==6)
+ 259   2              {
+ 260   3                  ZonaNotte = defaultZonaNotte;   
+ 261   3                  Zona Giorno = defaultZonaGiorno;
 
- 225   3                  break;
- 226   3      
- 227   3                  case 1:
- 228   3      #ifdef DBG_LEVEL
-       3              if (dbg1 == 1)
-       3              {
-       3                  printf("first loop : case 1. Pass order: %d/n", dbg2);
-       3                  dbg2++;
-       3              }        
-       3      #endif
- 235   3                      ManageHeatingOutputs();
- 236   3                      break;
- 237   3      
- 238   3      	        case 2:
- 239   3      		        ParseCOM();
- 240   3      		        break;
- 241   3      
- 242   3                  default:
- 243   3                      return;
- 244   3              }
- 245   2              nextaction++;
- 246   2          } 
- 247   1      }
- 248          
- 249          
- 250          void ParseCOM(void)
- 251          {
- 252   1      static unsigned char cmd=0;
- 253   1      static unsigned char op_len;
- 254   1      static unsigned char op_cnt;
- 255   1      static unsigned char parm1;
- 256   1      char c;
- 257   1      
- 258   1      // Manage the serial port "A" tick.
- 259   1          SetTermIOVectors(IOSerialPortA); //Set the serial port A as I/O console
- 260   1          TermIOTick(); //Manage the selected I/O console
- 261   1      
- 262   1         if (GetRxChars())
- 263   1          {
- 264   2      
- 265   2              // Read the received character.
- 266   2              c=GetCh();
- 267   2      
- 268   2              // a seconda del comando e' previsto dopo un operando di lunghezza op_len
- 269   2              switch (c)
- 270   2              {
- 271   3                  case 'H': //impostazione ora. Operando 2chr: hh
- 272   3                  case 'm': //impostazione minuti. Operando 2chr: mm 
- 273   3                  case 'M': //impostazione mese ed anno. Operando 2chr: MM
- 274   3                  case 'Y': //impostazione anno. Operando 2chr: YY
- 275   3          	    case 'C': //leggi vettore confort Piano 1. Operando 2chr: 00-23
- 276   3      	        case 'D': //leggi vettore confort Piano 0. Operando 2chr: 00-23
- 277   3      	        case 'I': //leggi input  x (00-15)
- 278   3      	        case 'O': //leggi output x (00-07)
- 279   3      	            cmd=c;
- 280   3      	            op_len=2; 
- 281   3        	            op_cnt= parm1=0;
- 282   3                      break;
- 283   3      
- 284   3      //configurazine vettore comfort piano 1
- 285   3                  case 'X': //imposta tutto spento alle ore hh. Operando 2chr: hh
- 286   3          	    case 'A': //imposta tutto acceso alle ore hh. Operando 2chr: hh
- 287   3      	        case 'G': //imposta zona giorno accesa alle ore hh. Operando 2chr: hh
- 288   3      	        case 'N': //imposta zona notte accesa alle ore hh. Operando 2chr: hh
- 289   3      	        case 'B': //imposta zona bagni accesa alle ore hh. Operando 2chr: hh
- 290   3      	            cmd=c;
- 291   3      	            op_len=2; 
- 292   3        	            op_cnt= parm1=0;
- 293   3                      break;
- 294   3      
- 295   3      //configurazine vettore comfort piano 0
- 296   3                  case 'x': //imposta tutto spento alle ore hh. Operando 2chr: hh
- 297   3          	    case 'a': //imposta tutto acceso alle ore hh. Operando 2chr: hh
- 298   3      	        case 'g': //imposta zona giorno accesa alle ore hh. Operando 2chr: hh
- 299   3      	        case 'n': //imposta zona notte accesa alle ore hh. Operando 2chr: hh
- 300   3      	        case 'b': //imposta zona notte accesa alle ore hh. Operando 2chr: hh
- 301   3      	            cmd=c;
- 302   3      	            op_len=2; 
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE  7
+*** ERROR C014 IN LINE 261 OF C:\Documents and Settings\ib\My Documents\RemoterApplications\HOPLA\CFile.c : Undefined 'Zona'
+ 262   3                  ZonaBagni =defaultZonaBagni;
+ 263   3                  P0ZonaUnica = defaultP0ZonaUnica;
+ 264   3              }
+ 265   2          }
+ 266   1          // Gestione sequenziale degli Input e degli Output e della seriale, con periodo di un secondo
+ 267   1          if (PLCPulse1000)
+ 268   1          {
+ 269   2              if (nextaction==2)
+ 270   2                  nextaction=0;
+ 271   2      
+ 272   2              switch (nextaction)
+ 273   2              {
+ 274   3                  case 0:
+ 275   3                      ;
+ 276   3                      break;
+ 277   3      
+ 278   3                  case 1:
+ 279   3                      ManageHeatingOutputs();
+ 280   3                      break;
+ 281   3      
+ 282   3      	        case 2:
+ 283   3                      ;
+ 284   3      		        break;
+ 285   3      
+ 286   3                  default:
+RC51 COMPILER V03.03.37,  CFILE                  03/17/11  19:16:42  PAGE  5
 
- 303   3        	            op_cnt= parm1=0;
- 304   3                      break;
- 305   3      
- 306   3                  case 'S': //leggi stato
- 307   3                  case 'T': //leggi ora
- 308   3      
- 309   3      	            cmd=c;
- 310   3      	            ExecuteCmd(cmd, parm1);
- 311   3      	            op_len= op_cnt= cmd = parm1 = 0; //reset 
- 312   3                      break;
- 313   3      
- 314   3               case '0': case '1': case '2': case '3': case '4':
- 315   3               case '5': case '6': case '7': case '8': case '9':
- 316   3                  op_cnt++;
- 317   3      		    if ((op_len == 0) || (cmd==0) || (op_len<op_cnt))
- 318   3      		    {	// errore !
- 319   4      			    cmd=op_len=op_cnt=parm1=0; //reset
- 320   4      //                printf("inside ParseCOM.switch.3; cmd %u\n", cmd);
- 321   4      
- 322   4                      break;
- 323   4      		    }    
- 324   3      		    if (op_cnt == 1) 
- 325   3                  {
- 326   4      			    parm1= (c - '0') ;
- 327   4      //                printf("char1=%u\n",parm1);
- 328   4                      break;
- 329   4                  }
- 330   3      		    if (op_cnt == 2) 
- 331   3      			{
- 332   4                      parm1= (c - '0') + parm1*10;
- 333   4      //                printf("char1=%u\n",parm1);
- 334   4      //                printf("inside ParseCOM.switch.5; cmd %u\n", cmd);
- 335   4      
- 336   4      		        ExecuteCmd(cmd, parm1);
- 337   4      	            cmd=op_len=op_cnt = parm1=0;            
- 338   4      	            return;
- 339   4                  }
- 340   3                  default:
- 341   3      		        cmd=op_len=op_cnt= parm1=0;            
- 342   3      	        return;
- 343   3              }
- 344   2        }
- 345   1      }
- 346          
- 347          char ExecuteCmd(unsigned char cmd, unsigned char parm1)
- 348          {
- 349   1      //static RTCDATA RtcData; //Rtc data structure
- 350   1      char i;
- 351   1      //  printf ("inside ExcuteCMD. cmd=%u parm1=%u", cmd, parm1);
- 352   1        
- 353   1          // Manage the serial port tick.
- 354   1          SetTermIOVectors(IOSerialPortA); //Set the serial port A as I/O console
- 355   1          TermIOTick(); //Manage the selected I/O console
- 356   1      
- 357   1          GetRtc(&RtcData); //Read the current RTC registers
- 358   1      
- 359   1          switch (cmd)
- 360   1          {
- 361   2              case 'H': //impostazione ora. Operando 2chr: hh
- 362   2              if (parm1>23)
- 363   2                  return (-1); 
- 364   2              RtcData.Hour = parm1;
- 365   2              SetRtc(&RtcData); //Write the RTC registers with the new values
- 366   2              break; 
- 367   2      
- 368   2              case 'm': //impostazione minuti. Operando 2chr: mm 
- 369   2              if (parm1>59) 
- 370   2                  return (-1);
- 371   2              RtcData.Minute = parm1;
- 372   2              SetRtc(&RtcData); //Write the RTC registers with the new values
- 373   2              break;
- 374   2      
- 375   2              case 'M': //impostazione mese. Operando 2chr: MM
- 376   2              if ((parm1>0) && (parm1<13)) 
- 377   2              {
- 378   3                      RtcData.Month = parm1;
- 379   3                      SetRtc(&RtcData); //Write the RTC registers with the new values
- 380   3                  break;
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 12
+ 287   3                      return;
+ 288   3              }
+ 289   2              nextaction++;
+ 290   2          } 
+ 291   1      }
+ 292          
+ 293          
+ 294          // @Section("Custom Function - 0.7.2")  nuovo parsecom
+ 295          // ritorna il numero del comando, sempre >0, in caso di successo
+ 296          // ritorna 0 no operation (ad esempio sta leggendo la riga)
+ 297          // ritorna <0 per errori
+ 298          char ParseCOM2(char *argcnt, char *argvect)
+ 299          {
+ 300   1      
+ 301   1      char *p;
+ 302   1      char c, i, retcmd;
+ 303   1      
+ 304   1      // Manage the serial port "A" tick.
+ 305   1          SetTermIOVectors(IOSerialPortA); //Set the serial port A as I/O console
+ 306   1          TermIOTick(); //Manage the selected I/O console
+ 307   1      
+ 308   1         if (GetRxChars())
+ 309   1          {
+ 310   2      
+ 311   2              // Read the received character.
+ 312   2              c=GetCh();
+ 313   2              if ( (isalnum(c) || isspace(c) || (c == ':')) && (c!= 13) ) 
+ 314   2              {
+ 315   3                  cmdline[chptr]=c;
+ 316   3                  chptr++;
+ 317   3      #ifdef DBG_PARSECOM
+       3      printf("c:%d cmdline[]:%c chptr:%d\n",c, cmdline[chptr-1],chptr);
+       3      #endif 
+ 320   3                  if (chptr==CMDLINEMAXLEN) //overflow
+ 321   3                  {
+ 322   4                      chptr=0;
+ 323   4                      cmdline[0]='\0';
+ 324   4      #ifdef DBG_PARSECOM
+       4                      printf("Error 1- cmdline overflow\n");
+       4      #endif            
+ 327   4                      return (-1);
+ 328   4                  }
+ 329   3              }    
+ 330   2              else if (c==13) //enter fine della riga di comando
+ 331   2              {
+ 332   3                  cmdline[chptr]='\0';
+ 333   3                  chptr=0;
+ 334   3                  printf("\ncmdline=%s\n",cmdline);
+ 335   3      
+ 336   3                  for (retcmd=0;retcmd<6;retcmd++)
+ 337   3                  	if ( (strstr(cmdline,commandlist[retcmd].cmd)) )
+ 338   3                      		break; //trovato il comando 
+ 339   3      	        	
+ 340   3                  if (retcmd== NUMCOMANDI) // non ho trovato comandi
+ 341   3                      return (-16);
+ 342   3      
+ 343   3                  p=cmdline+strlen(commandlist[retcmd].cmd);
+ 344   3      
+ 345   3                  for (i=0; i<commandlist[retcmd].argnum; i++)
+ 346   3                  {
+ 347   4          		//errore mi attendo un separatore
+ 348   4          		if ( ((*p)!=' ') && ((*p) != ':') )
+ 349   4          			return (-retcmd-16*1);
+ 350   4                 
+ 351   4          		//skip all white spaces
+ 352   4          		while (isspace(*p) || ((*p)==':'))
+ 353   4          			p++; 
+ 354   4      
+ 355   4      		//errore string terminata prima di aver letto tutti i parametri
+ 356   4          		if ((*p)== '\0') 
+ 357   4          			return (-retcmd-16*2);
+ 358   4      
+ 359   4          		//convert all digits
+ 360   4                  	argvect[i]=0;
+ 361   4          		while (isdigit(*p))
+ 362   4                          	argvect[i] = argvect[i]*10 + (*(p++))-'0';          
+ 363   4      	    }    
+ 364   3      
+RC51 COMPILER V03.03.37,  CFILE                  03/17/11  19:16:42  PAGE  6
 
- 381   3              }
- 382   2              return (-1);
- 383   2      
- 384   2              case 'Y': //impostazione anno. Operando 2chr: YY
- 385   2              if (parm1>99)
- 386   2                  return (-1);     
- 387   2              RtcData.Year = parm1;
- 388   2              SetRtc(&RtcData); //Write the RTC registers with the new values
- 389   2              break;
- 390   2      
- 391   2          	case 'C': //leggi vettore confort Piano 1. Operando 2chr: 00-23
- 392   2              if (parm1>23) 
- 393   2              {
- 394   3                  printf ( "errore input ora > 23. Inserire 2 cifre dopo il comando C. Es C21\n");
- 395   3                  return (-1);
- 396   3              }
- 397   2              printf ( "piano 1 dalle %u:00 alle %u:59 %c\n", parm1, parm1, comfortP1[parm1]);
+ 365   3          	// return parameter
+ 366   3          	*argcnt=commandlist[retcmd].argnum;
+ 367   3          	return (retcmd);
+ 368   3              }
+ 369   2          }
+ 370   1          return (0);
+ 371   1      }
+ 372          
+ 373          char ExecuteCmd(unsigned char cmd, unsigned char parm1)
+ 374          {
+ 375   1      char i;
+ 376   1      //  printf ("inside ExcuteCMD. cmd=%u parm1=%u", cmd, parm1);
+ 377   1        
+ 378   1          // Manage the serial port tick.
+ 379   1          SetTermIOVectors(IOSerialPortA); //Set the serial port A as I/O console
+ 380   1          TermIOTick(); //Manage the selected I/O console
+ 381   1      
+ 382   1          GetRtc(&RtcData); //Read the current RTC registers
+ 383   1      
+ 384   1          switch (cmd)
+ 385   1          {
+ 386   2              case 'H': //impostazione ora. Operando 2chr: hh
+ 387   2              if (parm1>23)
+ 388   2                  return (-1); 
+ 389   2              RtcData.Hour = parm1;
+ 390   2              SetRtc(&RtcData); //Write the RTC registers with the new values
+ 391   2              break; 
+ 392   2      
+ 393   2              case 'm': //impostazione minuti. Operando 2chr: mm 
+ 394   2              if (parm1>59) 
+ 395   2                  return (-1);
+ 396   2              RtcData.Minute = parm1;
+ 397   2              SetRtc(&RtcData); //Write the RTC registers with the new values
  398   2              break;
- 399   2               
- 400   2              case 'D': //leggi vettore confort Piano 0. Operando 2chr: 00-23
- 401   2              if (parm1>23) 
- 402   2              {
- 403   3                  printf ( "errore input ora > 23. Inserire 2 cifre dopo il comando D. Es D19\n");
- 404   3                  return (-1);
- 405   3              }
- 406   2              printf ( "piano 0 dalle %u:00 alle %u:59 %c\n", parm1, parm1, comfortP0[parm1]);
- 407   2              break;
- 408   2      
- 409   2      	    case 'I': //leggi input  x (00-15)
- 410   2              if (parm1>15) 
- 411   2              {
- 412   3                  printf ( "errore input > 15. Inserire 2 cifre dopo il comando I. Es I01\n");
- 413   3                  return (-1);
- 414   3              }
+ 399   2      
+ 400   2              case 'd': //impostazione giorno. Operando 2chr: gg
+ 401   2              if (parm1>31)
+ 402   2                  return (-1);     
+ 403   2              RtcData.Day = parm1;
+ 404   2              SetRtc(&RtcData); //Write the RTC registers with the new values
+ 405   2              break;
+ 406   2      
+ 407   2              case 'M': //impostazione mese. Operando 2chr: MM
+ 408   2              if ((parm1>0) && (parm1<13)) 
+ 409   2              {
+ 410   3                      RtcData.Month = parm1;
+ 411   3                      SetRtc(&RtcData); //Write the RTC registers with the new values
+ 412   3                  break;
+ 413   3              }
+ 414   2              return (-1);
  415   2      
- 416   2              printf ( "input %u: %u\n", parm1, DI[parm1] );
- 417   2              break;
- 418   2      
- 419   2      	 case 'O': //leggi output x (00-07)
- 420   2              if (parm1>7)
- 421   2              {
- 422   3                  printf ( "errore input > 7. Inserire 2 cifre dopo il comando O. Es O06\n");
- 423   3                  return (-1);
- 424   3              }
- 425   2              printf ( "output %u: %u\n", parm1, PLCOpO(parm1) );
- 426   2              break;
- 427   2      
- 428   2      	    case 'S': //leggi stato
- 429   2              // @Section("Custom Function - 0.7.0") - riduzione object code usando cicli for
- 430   2              // 24 byte comfort vector piano 0
- 431   2      /*        printf ( "%c%c%c%c", comfortP0[0],comfortP0[1],comfortP0[2],comfortP0[3]);
- 432   2              printf ( "%c%c%c%c", comfortP0[4],comfortP0[5],comfortP0[6],comfortP0[7]);
- 433   2              printf ( "%c%c%c%c", comfortP0[8],comfortP0[9],comfortP0[10],comfortP0[11]);
- 434   2              printf ( "%c%c%c%c", comfortP0[12],comfortP0[13],comfortP0[14],comfortP0[15]);
- 435   2              printf ( "%c%c%c%c", comfortP0[16],comfortP0[17],comfortP0[18],comfortP0[19]);
- 436   2              printf ( "%c%c%c%c", comfortP0[20],comfortP0[21],comfortP0[22],comfortP0[23]);
- 437   2      
- 438   2              // 24 byte comfort vector piano 1
- 439   2              printf ( "%c%c%c%c", comfortP1[0],comfortP1[1],comfortP1[2],comfortP1[3]);
- 440   2              printf ( "%c%c%c%c", comfortP1[4],comfortP1[5],comfortP1[6],comfortP1[7]);
- 441   2              printf ( "%c%c%c%c", comfortP1[8],comfortP1[9],comfortP1[10],comfortP1[11]);
- 442   2              printf ( "%c%c%c%c", comfortP1[12],comfortP1[13],comfortP1[14],comfortP1[15]);
- 443   2              printf ( "%c%c%c%c", comfortP1[16],comfortP1[17],comfortP1[18],comfortP1[19]);
- 444   2              printf ( "%c%c%c%c", comfortP1[20],comfortP1[21],comfortP1[22],comfortP1[23]);
- 445   2      */
- 446   2              for (i=0;i<24;i++) printf ( "%c", comfortP0[i]);
- 447   2              for (i=0;i<24;i++) printf ( "%c", comfortP1[i]);
- 448   2      
- 449   2              // 16 byte input
- 450   2      //        printf ( "%u%u%u%u", DI[0],DI[1],DI[2],DI[3] );
- 451   2      //        printf ( "%u%u%u%u", DI[4],DI[5],DI[6],DI[7] );
- 452   2      //        printf ( "%u%u%u%u", DI[8],DI[9],DI[10],DI[11] );
- 453   2      //        printf ( "%u%u%u%u", DI[12],DI[13],DI[14],DI[15] );
- 454   2              for (i=0;i<16;i++) printf ( "%u", DI[i]);
- 455   2      
- 456   2              // 8 byte output
- 457   2              printf ( "%u%u%u%u", PLCOpO(0), PLCOpO(1), PLCOpO(2), PLCOpO(3) );
- 458   2              printf ( "%u%u%u%u", PLCOpO(4), PLCOpO(5), PLCOpO(6), PLCOpO(7) );
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 13
+ 416   2              case 'Y': //impostazione anno. Operando 2chr: YY
+ 417   2              if (parm1>99)
+ 418   2                  return (-1);     
+ 419   2              RtcData.Year = parm1;
+ 420   2              SetRtc(&RtcData); //Write the RTC registers with the new values
+ 421   2              break;
+ 422   2      
+ 423   2          	case 'C': //leggi vettore confort Piano 1. Operando 2chr: 00-23
+ 424   2              if (parm1>23) 
+ 425   2              {
+ 426   3                  printf ( "errore input ora > 23. Inserire 2 cifre dopo il comando C. Es C21\n");
+ 427   3                  return (-1);
+ 428   3              }
+ 429   2              printf ( "piano 1 dalle %u:00 alle %u:59 %c\n", parm1, parm1, comfortP1[parm1]);
+ 430   2              break;
+ 431   2               
+ 432   2              case 'D': //leggi vettore confort Piano 0. Operando 2chr: 00-23
+ 433   2              if (parm1>23) 
+ 434   2              {
+ 435   3                  printf ( "errore input ora > 23. Inserire 2 cifre dopo il comando D. Es D19\n");
+ 436   3                  return (-1);
+ 437   3              }
+ 438   2              printf ( "piano 0 dalle %u:00 alle %u:59 %c\n", parm1, parm1, comfortP0[parm1]);
+ 439   2              break;
+ 440   2      
+ 441   2      	    case 'I': //leggi input  x (00-15)
+ 442   2              if (parm1>15) 
+RC51 COMPILER V03.03.37,  CFILE                  03/17/11  19:16:42  PAGE  7
 
- 459   2       
- 460   2              // misura tempo di accensione
- 461   2              // @Section("Custom Function - 0.7.0") leggi tempo di accensione
- 462   2              printf ( "\nPLC ON FROM: %u %u %u - %u:%u ", RtcPLCSTARTTime.Day, RtcPLCSTARTTime.Month, RtcPLCSTARTTime.Year,
+ 443   2              {
+ 444   3                  printf ( "errore input > 15. Inserire 2 cifre dopo il comando I. Es I01\n");
+ 445   3                  return (-1);
+ 446   3              }
+ 447   2      
+ 448   2              printf ( "input %u: %u\n", parm1, DI[parm1] );
+ 449   2              break;
+ 450   2      
+ 451   2      	 case 'O': //leggi output x (00-07)
+ 452   2              if (parm1>7)
+ 453   2              {
+ 454   3                  printf ( "errore input > 7. Inserire 2 cifre dopo il comando O. Es O06\n");
+ 455   3                  return (-1);
+ 456   3              }
+ 457   2              printf ( "output %u: %u\n", parm1, PLCOpO(parm1) );
+ 458   2              break;
+ 459   2      
+ 460   2      	    case 'S': //leggi stato
+ 461   2              // @Section("Custom Function - 0.7.0") - riduzione object code usando cicli for
+ 462   2              // 24 byte comfort vector piano 0
+ 463   2              for (i=0;i<24;i++) printf ( "%c", comfortP0[i]);
+ 464   2              for (i=0;i<24;i++) printf ( "%c", comfortP1[i]);
+ 465   2      
+ 466   2              // 16 byte input
+ 467   2              for (i=0;i<16;i++) printf ( "%u", DI[i]);
+ 468   2      
+ 469   2              // 8 byte output
+ 470   2              printf ( "%u%u%u%u", PLCOpO(0), PLCOpO(1), PLCOpO(2), PLCOpO(3) );
+ 471   2              printf ( "%u%u%u%u", PLCOpO(4), PLCOpO(5), PLCOpO(6), PLCOpO(7) );
+ 472   2       
+ 473   2              // misura tempo di accensione
+ 474   2              // @Section("Custom Function - 0.7.0") leggi tempo di accensione
+ 475   2              printf ( "\nPLC ON FROM: %u %u %u - %u:%u ", RtcPLCSTARTTime.Day, RtcPLCSTARTTime.Month, RtcPLCSTARTTime.Year,
             - RtcPLCSTARTTime.Hour, RtcPLCSTARTTime.Minute );
- 463   2              printf ( "\nLAST CALDAIA ON: %u %u %u - %u:%u ", RtcONTime.Day, RtcONTime.Month, RtcONTime.Year, RtcONTime.Hou
+ 476   2              printf ( "\nLAST CALDAIA ON: %u %u %u - %u:%u ", RtcONTime.Day, RtcONTime.Month, RtcONTime.Year, RtcONTime.Hou
             -r, RtcONTime.Minute );
- 464   2              printf ( "\nCALDAIA ON FROM%u", TotMinutiON);
- 465   2          
- 466   2              printf ( "\n");
- 467   2       
- 468   2              break;
- 469   2      
- 470   2      	    case 'T': //leggi real time clock
- 471   2              printf ( "real time clock: %u %u %u - %u:%u:%u\n ", RtcData.Day, RtcData.Month, RtcData.Year, RtcData.Hour, Rt
+ 477   2              printf ( "\nCALDAIA ON FROM%u", TotMinutiON);
+ 478   2          
+ 479   2              printf ( "\n");
+ 480   2       
+ 481   2              break;
+ 482   2      
+ 483   2      	    case 'T': //leggi real time clock
+ 484   2              printf ( "real time clock: %u %u %u - %u:%u:%u\n ", RtcData.Day, RtcData.Month, RtcData.Year, RtcData.Hour, Rt
             -cData.Minute, RtcData.Second );
- 472   2              break;
- 473   2      
- 474   2      //configurazine vettore comfort piano 1
- 475   2              case 'X': //imposta tutto spento alle ore hh. Operando 2chr: hh
- 476   2          	case 'A': //imposta tutto acceso alle ore hh. Operando 2chr: hh
- 477   2      	    case 'G': //imposta zona giorno accesa alle ore hh. Operando 2chr: hh
- 478   2      	    case 'N': //imposta zona notte accesa alle ore hh. Operando 2chr: hh
- 479   2      	    case 'B': //imposta zona notte accesa alle ore hh. Operando 2chr: hh
- 480   2      	    if (parm1>23) 
- 481   2              {
- 482   3                  printf ( "errore input ora > 23. Inserire 2 cifre dopo il comando %c. Es %c19\n",cmd,cmd);
- 483   3                  return (-1);
- 484   3              }
- 485   2                  comfortP1[parm1]=cmd;
- 486   2                  printf ( "piano 1 impostato ad %c dalle %u:00 alle %u:59\n", comfortP1[parm1],parm1, parm1);
- 487   2                  break;
- 488   2      
- 489   2      //configurazine vettore comfort piano 0
- 490   2                  case 'x': //imposta tutto spento alle ore hh. Operando 2chr: hh
- 491   2          	    case 'a': //imposta tutto acceso alle ore hh. Operando 2chr: hh
- 492   2      	        case 'g': //imposta zona giorno accesa alle ore hh. Operando 2chr: hh
- 493   2      	        case 'n': //imposta zona notte accesa alle ore hh. Operando 2chr: hh
- 494   2                  case 'b': //imposta zona notte accesa alle ore hh. Operando 2chr: hh
- 495   2                  if (parm1>23) 
- 496   2                  {
- 497   3                      printf ( "errore input ora > 23. Inserire 2 cifre dopo il comando %c. Es %c19\n",cmd,cmd);
- 498   3                      return (-1);
- 499   3                  }
- 500   2                  comfortP0[parm1]=cmd+'X'-'x';
- 501   2                  printf ( "piano 0 impostato ad %c dalle %u:00 alle %u:59\n", comfortP0[parm1],parm1, parm1);
- 502   2                  break;
- 503   2          }
- 504   1      	return (0);
- 505   1      }
- 506          
- 507          void   ManageHeatingOutputs(void)
- 508          {
- 509   1      
- 510   1          GetRtc(&RtcData); //Read the current RTC registers
- 511   1      
- 512   1          DO[ZONA1B]= FALSE ; // zona bagni e corridoio 
- 513   1          DO[ZONA1G]= FALSE;
- 514   1          DO[ZONA1N]= FALSE;
- 515   1          DO[ZONAP0]= FALSE ; // unica zona al piano 0   
- 516   1          openvalves = 0;     
- 517   1      
- 518   1          // First level heating zones corridoio
- 519   1          if (DI[TERMOSTATOP1CORR])
- 520   1          {
- 521   2      //        switch(comfortP1[PLCRtcHour])
- 522   2                switch(comfortP1[RtcData.Hour])
- 523   2              {
- 524   3              case 'A':
- 525   3              case 'N':
- 526   3              case 'G':
- 527   3              case 'B':
- 528   3                  DO[ZONA1B] = TRUE ; // zona bagni e corridoio sempre on
- 529   3                  openvalves++;
- 530   3                  break;
- 531   3            
- 532   3              case 'X':
- 533   3              default:
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 26
+ 485   2              break;
+ 486   2      
+ 487   2      //configurazine vettore comfort piano 1
+ 488   2              case 'X': //imposta tutto spento alle ore hh. Operando 2chr: hh
+ 489   2          	case 'A': //imposta tutto acceso alle ore hh. Operando 2chr: hh
+ 490   2      	    case 'G': //imposta zona giorno accesa alle ore hh. Operando 2chr: hh
+ 491   2      	    case 'N': //imposta zona notte accesa alle ore hh. Operando 2chr: hh
+ 492   2      	    case 'B': //imposta zona notte accesa alle ore hh. Operando 2chr: hh
+ 493   2      	    if (parm1>23) 
+ 494   2              {
+ 495   3                  printf ( "errore input ora > 23. Inserire 2 cifre dopo il comando %c. Es %c19\n",cmd,cmd);
+ 496   3                  return (-1);
+ 497   3              }
+ 498   2                  comfortP1[parm1]=cmd;
+ 499   2                  printf ( "piano 1 impostato ad %c dalle %u:00 alle %u:59\n", comfortP1[parm1],parm1, parm1);
+ 500   2                  break;
+ 501   2      
+ 502   2      //configurazine vettore comfort piano 0
+ 503   2                  case 'x': //imposta tutto spento alle ore hh. Operando 2chr: hh
+ 504   2          	    case 'a': //imposta tutto acceso alle ore hh. Operando 2chr: hh
+ 505   2      	        case 'g': //imposta zona giorno accesa alle ore hh. Operando 2chr: hh
+ 506   2      	        case 'n': //imposta zona notte accesa alle ore hh. Operando 2chr: hh
+ 507   2                  case 'b': //imposta zona notte accesa alle ore hh. Operando 2chr: hh
+ 508   2                  if (parm1>23) 
+ 509   2                  {
+ 510   3                      printf ( "errore input ora > 23. Inserire 2 cifre dopo il comando %c. Es %c19\n",cmd,cmd);
+ 511   3                      return (-1);
+ 512   3                  }
+ 513   2                  comfortP0[parm1]=cmd+'X'-'x';
+ 514   2                  printf ( "piano 0 impostato ad %c dalle %u:00 alle %u:59\n", comfortP0[parm1],parm1, parm1);
+ 515   2                  break;
+ 516   2          }
+ 517   1      	return (0);
+RC51 COMPILER V03.03.37,  CFILE                  03/17/11  19:16:42  PAGE  8
 
- 534   3                  DO[ZONA1B] = FALSE ; // tutto spento
- 535   3                  break;
- 536   3              }
- 537   2          }
- 538   1      
- 539   1          // First level heating zones Paolo
- 540   1          // @Section("Custom Function - 0.6.0")
- 541   1          // @Section("Custom Function - 0.6.1")
- 542   1          if (DI[TERMOSTATOP1PAOLO])
- 543   1          {
- 544   2      //        switch(comfortP1[PLCRtcHour])
- 545   2                switch(comfortP1[RtcData.Hour])
- 546   2              {
- 547   3              case 'A':
- 548   3              case 'N':
- 549   3                  DO[ZONA1N] =TRUE;
- 550   3                  openvalves++;
- 551   3                  break;
- 552   3              case 'G':
- 553   3              case 'B':
- 554   3              case 'X':
- 555   3              default:
- 556   3                  DO[ZONA1N] =FALSE;
- 557   3                  break;
- 558   3              }
- 559   2          }
- 560   1      
- 561   1         // 0.6.1: First level heating zones SOGGIORNO
- 562   1         // @Section("Custom Function - 0.6.1")
- 563   1          if (DI[TERMOSTATOP1GIORNO])
- 564   1          {
- 565   2      //        switch(comfortP1[PLCRtcHour])
- 566   2                switch(comfortP1[RtcData.Hour])
- 567   2              {
- 568   3              case 'A':
- 569   3              case 'G':
- 570   3                  DO[ZONA1G] =TRUE;
- 571   3                  openvalves++;
- 572   3                  break;
- 573   3              case 'N':
- 574   3              case 'B':
- 575   3              case 'X':
- 576   3              default:
- 577   3                  DO[ZONA1G] =FALSE;
- 578   3                  break;
- 579   3              }
- 580   2          }
- 581   1      
- 582   1          // Level zero heating zone
- 583   1          if (DI[TERMOSTATOP0])
- 584   1          {
- 585   2              switch(comfortP0[RtcData.Hour])
- 586   2              {
- 587   3              case 'A':
- 588   3              case 'N':
- 589   3              case 'G':
- 590   3              case 'B':
- 591   3                  DO[ZONAP0]= TRUE ; // unica zona al piano 0
- 592   3                  openvalves++;
- 593   3                  break;
- 594   3      
- 595   3              default:
- 596   3                  DO[ZONAP0] = FALSE ; // unica zona al piano 0
- 597   3                  break;
- 598   3              }
- 599   2          }
- 600   1      
- 601   1      // Open/Close VALVES
- 602   1          PLCOpO(ZONA1B)= DO[ZONA1B];
- 603   1          PLCOpO(ZONA1G)= DO[ZONA1G];
- 604   1          PLCOpO(ZONA1N)= DO[ZONA1N];
- 605   1          PLCOpO(ZONAP0)= DO[ZONAP0];
- 606   1      
- 607   1      
- 608   1      // Switch on heater only if at last a zone need heating
- 609   1          if  ( (DI[TERMOSTATOP0] || DI[TERMOSTATOP1CORR] || DI[TERMOSTATOP1PAOLO]|| DI[TERMOSTATOP1GIORNO]) && openvalves )
-            - 
- 610   1      	    PLCOpO(HEATER_ON)= TRUE; 
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 27
+ 518   1      }
+ 519          
+ 520          void   ManageHeatingOutputs(void)
+ 521          {
+ 522   1      
+ 523   1          GetRtc(&RtcData); //Read the current RTC registers
+ 524   1      
+ 525   1          DO[ZONA1B]= FALSE ; // zona bagni e corridoio 
+ 526   1          DO[ZONA1G]= FALSE;
+ 527   1          DO[ZONA1N]= FALSE;
+ 528   1          DO[ZONAP0]= FALSE ; // unica zona al piano 0   
+ 529   1          openvalves = 0;     
+ 530   1      
+ 531   1          // First level heating zones corridoio
+ 532   1          if (DI[TERMOSTATOP1CORR])
+ 533   1          {
+ 534   2      //        switch(comfortP1[PLCRtcHour])
+ 535   2                switch(comfortP1[RtcData.Hour])
+ 536   2              {
+ 537   3              case 'A':
+ 538   3              case 'N':
+ 539   3              case 'G':
+ 540   3              case 'B':
+ 541   3                  DO[ZONA1B] = TRUE ; // zona bagni e corridoio sempre on
+ 542   3                  openvalves++;
+ 543   3                  break;
+ 544   3            
+ 545   3              case 'X':
+ 546   3              default:
+ 547   3                  DO[ZONA1B] = FALSE ; // tutto spento
+ 548   3                  break;
+ 549   3              }
+ 550   2          }
+ 551   1      
+ 552   1          // First level heating zones Paolo
+ 553   1          // @Section("Custom Function - 0.6.0")
+ 554   1          // @Section("Custom Function - 0.6.1")
+ 555   1          if (DI[TERMOSTATOP1PAOLO])
+ 556   1          {
+ 557   2      //        switch(comfortP1[PLCRtcHour])
+ 558   2                switch(comfortP1[RtcData.Hour])
+ 559   2              {
+ 560   3              case 'A':
+ 561   3              case 'N':
+ 562   3                  DO[ZONA1N] =TRUE;
+ 563   3                  openvalves++;
+ 564   3                  break;
+ 565   3              case 'G':
+ 566   3              case 'B':
+ 567   3              case 'X':
+ 568   3              default:
+ 569   3                  DO[ZONA1N] =FALSE;
+ 570   3                  break;
+ 571   3              }
+ 572   2          }
+ 573   1      
+ 574   1         // 0.6.1: First level heating zones SOGGIORNO
+ 575   1         // @Section("Custom Function - 0.6.1")
+ 576   1          if (DI[TERMOSTATOP1GIORNO])
+ 577   1          {
+ 578   2      //        switch(comfortP1[PLCRtcHour])
+ 579   2                switch(comfortP1[RtcData.Hour])
+ 580   2              {
+ 581   3              case 'A':
+ 582   3              case 'G':
+ 583   3                  DO[ZONA1G] =TRUE;
+ 584   3                  openvalves++;
+ 585   3                  break;
+ 586   3              case 'N':
+ 587   3              case 'B':
+ 588   3              case 'X':
+ 589   3              default:
+ 590   3                  DO[ZONA1G] =FALSE;
+ 591   3                  break;
+ 592   3              }
+ 593   2          }
+ 594   1      
+ 595   1          // Level zero heating zone
+RC51 COMPILER V03.03.37,  CFILE                  03/17/11  19:16:42  PAGE  9
 
- 611   1          else 
- 612   1      	    PLCOpO(HEATER_ON)= FALSE; 
+ 596   1          if (DI[TERMOSTATOP0])
+ 597   1          {
+ 598   2              switch(comfortP0[RtcData.Hour])
+ 599   2              {
+ 600   3              case 'A':
+ 601   3              case 'N':
+ 602   3              case 'G':
+ 603   3              case 'B':
+ 604   3                  DO[ZONAP0]= TRUE ; // unica zona al piano 0
+ 605   3                  openvalves++;
+ 606   3                  break;
+ 607   3      
+ 608   3              default:
+ 609   3                  DO[ZONAP0] = FALSE ; // unica zona al piano 0
+ 610   3                  break;
+ 611   3              }
+ 612   2          }
  613   1      
- 614   1          
- 615   1      // 0.7.0 Antiicing management, upgrade per azionare rolling tutte le valvole
- 616   1      // LASCIO SEMPRE ALMENO UNA VALVOLA APERTA PER PERMETTERE IL DEICING, GESTITO DALLA CALDAIA
- 617   1      // @Section("Custom Function - 0.7.0")
- 618   1          if (!openvalves) 
- 619   1          {
- 620   2              switch(RtcData.Hour%3)
- 621   2              {   
- 622   3      	    case 0: PLCOpO(ZONA1B)= TRUE ; // zona bagni e corridoio P1    
- 623   3                      break;
- 624   3              case 1: PLCOpO(ZONAP0)= TRUE ; // unica zona al piano 0
- 625   3                      break;
- 626   3              case 2: PLCOpO(ZONA1G)= TRUE ; //  zona giorno P1
- 627   3                      break;
- 628   3              case 3: PLCOpO(ZONA1N)= TRUE ; //  zona notte P1
- 629   3                      break;
- 630   3              }
- 631   2          }
- 632   1      
- 633   1      
- 634   1      // gestisco accensine/spegnimento a cavallo di 2 giorni
- 635   1      // @Section("Custom Function - 0.7.1")  statistiche
- 636   1              if (RtcData.Day>RtcONTime.Day) // cambiato giorno in questo ciclo
- 637   1              {
- 638   2                  TotMinutiON +=  
- 639   2                    ((24 *60 + 60)
- 640   2                    -(RtcONTime.Hour  *60 + RtcONTime.Minute  ));
- 641   2      
- 642   2                  StatMinutiON[RtcONTime.Month-1][RtcONTime.Day-1]=TotMinutiON;
- 643   2                  TotMinutiON=0;
- 644   2                  GetRtc (&RtcONTime);
- 645   2              }
+ 614   1      // Open/Close VALVES
+ 615   1          PLCOpO(ZONA1B)= DO[ZONA1B];
+ 616   1          PLCOpO(ZONA1G)= DO[ZONA1G];
+ 617   1          PLCOpO(ZONA1N)= DO[ZONA1N];
+ 618   1          PLCOpO(ZONAP0)= DO[ZONAP0];
+ 619   1      
+ 620   1      
+ 621   1      // Switch on heater only if at last a zone need heating
+ 622   1          if  ( (DI[TERMOSTATOP0] || DI[TERMOSTATOP1CORR] || DI[TERMOSTATOP1PAOLO]|| DI[TERMOSTATOP1GIORNO]) && openvalves )
+            - 
+ 623   1      	    PLCOpO(HEATER_ON)= TRUE; 
+ 624   1          else 
+ 625   1      	    PLCOpO(HEATER_ON)= FALSE; 
+ 626   1      
+ 627   1          
+ 628   1      // 0.7.0 Antiicing management, upgrade per azionare rolling tutte le valvole
+ 629   1      // LASCIO SEMPRE ALMENO UNA VALVOLA APERTA PER PERMETTERE IL DEICING, GESTITO DALLA CALDAIA
+ 630   1      // @Section("Custom Function - 0.7.0")
+ 631   1          if (!openvalves) 
+ 632   1          {
+ 633   2              switch(RtcData.Hour%3)
+ 634   2              {   
+ 635   3      	    case 0: PLCOpO(ZONA1B)= TRUE ; // zona bagni e corridoio P1    
+ 636   3                      break;
+ 637   3              case 1: PLCOpO(ZONAP0)= TRUE ; // unica zona al piano 0
+ 638   3                      break;
+ 639   3              case 2: PLCOpO(ZONA1G)= TRUE ; //  zona giorno P1
+ 640   3                      break;
+ 641   3              case 3: PLCOpO(ZONA1N)= TRUE ; //  zona notte P1
+ 642   3                      break;
+ 643   3              }
+ 644   2          }
+ 645   1      
  646   1      
- 647   1      // misura tempo di accensione
- 648   1      // @Section("Custom Function - 0.7.0")
- 649   1          if (openvalves && !PreviousStatus) //si e' acceso adesso
- 650   1          {
- 651   2              GetRtc (&RtcONTime);
- 652   2              PreviousStatus = TRUE;
- 653   2       //       if (PLCOpO(ZONA1N)) PreviousStatus = K_ZONA1N;
- 654   2       //       if (PLCOpO(ZONA1G)) PreviousStatus += K_ZONA1G;
- 655   2       //       if (PLCOpO(ZONA1B)) PreviousStatus += K_ZONA1B;
- 656   2       //       if (PLCOpO(ZONAP0)) PreviousStatus += K_ZONAP0;
- 657   2      
- 658   2          }
- 659   1          else if (!openvalves && PreviousStatus) //si e' spento adesso
- 660   1          {
- 661   2              // GetRtc (&RtcTimeNow);
- 662   2       
- 663   2              TotMinutiON +=  
- 664   2                   (RtcData.Hour *60 + RtcData.Minute )
- 665   2                  -(RtcONTime.Hour  *60 + RtcONTime.Minute  ); 
- 666   2          
- 667   2      //    TotOreON = TotOreON+ (unsigned int)(TotMinutiON/60);
- 668   2      //    TotMinutiON=(unsigned int)(TotMinutiON%60);
- 669   2              PreviousStatus=FALSE;
- 670   2      }
- 671   1      //        TotTermoON += PreviousStatus;
- 672   1      
- 673   1      }
- 674          
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 34
+ 647   1      // gestisco accensine/spegnimento a cavallo di 2 giorni
+ 648   1      // @Section("Custom Function - 0.7.1")  statistiche
+ 649   1              if (RtcData.Day>RtcONTime.Day) // cambiato giorno in questo ciclo
+ 650   1              {
+ 651   2                  TotMinutiON +=  
+ 652   2                    ((24 *60 + 60)
+ 653   2                    -(RtcONTime.Hour  *60 + RtcONTime.Minute  ));
+ 654   2      
+ 655   2                  StatMinutiON[RtcONTime.Month-1][RtcONTime.Day-1]=TotMinutiON;
+ 656   2                  TotMinutiON=0;
+ 657   2                  GetRtc (&RtcONTime);
+ 658   2              }
+ 659   1      
+ 660   1      // misura tempo di accensione
+ 661   1      // @Section("Custom Function - 0.7.0")
+ 662   1          if (openvalves && !PreviousStatus) //si e' acceso adesso
+ 663   1          {
+ 664   2              GetRtc (&RtcONTime);
+ 665   2              PreviousStatus = TRUE;
+ 666   2       //       if (PLCOpO(ZONA1N)) PreviousStatus = K_ZONA1N;
+ 667   2       //       if (PLCOpO(ZONA1G)) PreviousStatus += K_ZONA1G;
+ 668   2       //       if (PLCOpO(ZONA1B)) PreviousStatus += K_ZONA1B;
+ 669   2       //       if (PLCOpO(ZONAP0)) PreviousStatus += K_ZONAP0;
+ 670   2      
+ 671   2          }
+ 672   1          else if (!openvalves && PreviousStatus) //si e' spento adesso
+RC51 COMPILER V03.03.37,  CFILE                  03/17/11  19:16:42  PAGE 10
+
+ 673   1          {
+ 674   2              // GetRtc (&RtcTimeNow);
+ 675   2       
+ 676   2              TotMinutiON +=  
+ 677   2                   (RtcData.Hour *60 + RtcData.Minute )
+ 678   2                  -(RtcONTime.Hour  *60 + RtcONTime.Minute  ); 
+ 679   2          
+ 680   2      //    TotOreON = TotOreON+ (unsigned int)(TotMinutiON/60);
+ 681   2      //    TotMinutiON=(unsigned int)(TotMinutiON%60);
+ 682   2              PreviousStatus=FALSE;
+ 683   2      }
+ 684   1      //        TotTermoON += PreviousStatus;
+ 685   1      
+ 686   1      }
+ 687          
+ 688          
+ 689          
+RC51 COMPILER V03.03.37,  CFILE                  03/17/11  19:16:42  PAGE 11
 
 ASSEMBLY LISTING OF GENERATED OBJECT CODE
 
-            ; FUNCTION CustomFunction (BEGIN)
-                                           ; SOURCE LINE # 159 
-0000 900000  R      MOV    DPTR,#PLCFirstLoop
-0003 E0             MOVX   A,@DPTR
-0004 7003           JNZ    $ + 5
-0006 020000  R      LJMP   ?NXT8
-                                           ; SOURCE LINE # 164 
-0009 900000  R      MOV    DPTR,#IOSerialPortA
-000C E0             MOVX   A,@DPTR
-000D FE             MOV    R6,A
-000E A3             INC    DPTR
-000F E0             MOVX   A,@DPTR
-0010 FF             MOV    R7,A
-0011 120000  R      LCALL  _SetTermIOVectors
-                                           ; SOURCE LINE # 165 
-0014 7F00    R      MOV    R7,#LOW (SerialStruct) 
-0016 7E00    R      MOV    R6,#HIGH (SerialStruct) 
-0018 120000  R      LCALL  _GetSerialMode
-                                           ; SOURCE LINE # 166 
-001B 900000  R      MOV    DPTR,#SerialStruct
-001E E0             MOVX   A,@DPTR
-001F 54FE           ANL    A,#0FEH
-0021 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 167 
-0022 54FD           ANL    A,#0FDH
-0024 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 168 
-0025 4404           ORL    A,#004H
-0027 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 169 
-0028 548F           ANL    A,#08FH
-002A 4420           ORL    A,#020H
-002C F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 170 
-002D 547F           ANL    A,#07FH
-002F F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 171 
-0030 A3             INC    DPTR
-0031 E0             MOVX   A,@DPTR
-0032 4410           ORL    A,#010H
-0034 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 172 
-0035 4420           ORL    A,#020H
-0037 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 173 
-0038 4440           ORL    A,#040H
-003A F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 174 
-003B 900000  R      MOV    DPTR,#SerialStruct
-003E E0             MOVX   A,@DPTR
-003F 547F           ANL    A,#07FH
-0041 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 175 
-0042 A3             INC    DPTR
-0043 E0             MOVX   A,@DPTR
-0044 54F0           ANL    A,#0F0H
-0046 4406           ORL    A,#006H
-0048 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 176 
-0049 900000  R      MOV    DPTR,#SerialStruct+03H
-004C E4             CLR    A
-004D F0             MOVX   @DPTR,A
-004E A3             INC    DPTR
-004F F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 177 
-0050 A3             INC    DPTR
-0051 F0             MOVX   @DPTR,A
-0052 A3             INC    DPTR
-0053 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 178 
-0054 7F00    R      MOV    R7,#LOW (SerialStruct) 
-0056 7E00    R      MOV    R6,#HIGH (SerialStruct) 
-0058 120000  R      LCALL  _SetSerialMode
-                                           ; SOURCE LINE # 181 
-005B 900000  R      MOV    DPTR,#PreviousStatus
-005E E4             CLR    A
-005F F0             MOVX   @DPTR,A
-0060 A3             INC    DPTR
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE  5
-
-0061 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 182 
-0062 900000  R      MOV    DPTR,#TotOreON
-0065 F0             MOVX   @DPTR,A
-0066 A3             INC    DPTR
-0067 F0             MOVX   @DPTR,A
-0068 900000  R      MOV    DPTR,#TotMinutiON
-006B F0             MOVX   @DPTR,A
-006C A3             INC    DPTR
-006D F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 183 
-006E 7F00    R      MOV    R7,#LOW (RtcPLCSTARTTime) 
-0070 7E00    R      MOV    R6,#HIGH (RtcPLCSTARTTime) 
-0072 120000  R      LCALL  _GetRtc
-                                           ; SOURCE LINE # 185 
-0075 900000  R      MOV    DPTR,#i
-0078 E4             CLR    A
-0079 F0             MOVX   @DPTR,A
-007A A3             INC    DPTR
-007B F0             MOVX   @DPTR,A
-007C         ?FOR2:
-                                           ; SOURCE LINE # 186 
-007C 900000  R      MOV    DPTR,#j
-007F E4             CLR    A
-0080 F0             MOVX   @DPTR,A
-0081 A3             INC    DPTR
-0082 F0             MOVX   @DPTR,A
-0083         ?FOR3:
-                                           ; SOURCE LINE # 187 
-0083 900000  R      MOV    DPTR,#j+01H
-0086 E0             MOVX   A,@DPTR
-0087 FA             MOV    R2,A
-0088 2A             ADD    A,R2
-0089 FB             MOV    R3,A
-008A 900000  R      MOV    DPTR,#i
-008D E0             MOVX   A,@DPTR
-008E FE             MOV    R6,A
-008F A3             INC    DPTR
-0090 E0             MOVX   A,@DPTR
-0091 FF             MOV    R7,A
-0092 900000  R      MOV    DPTR,#StatMinutiON
-0095 75F03E         MOV    B,#03EH
-0098 120000  R      LCALL  ?C_CBADDMUL
-009B EB             MOV    A,R3
-009C 2582           ADD    A,DPL
-009E F582           MOV    DPL,A
-00A0 E4             CLR    A
-00A1 3583           ADDC   A,DPH
-00A3 F583           MOV    DPH,A
-00A5 E4             CLR    A
-00A6 F0             MOVX   @DPTR,A
-00A7 A3             INC    DPTR
-00A8 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 186 
-00A9 900000  R      MOV    DPTR,#j+01H
-00AC E0             MOVX   A,@DPTR
-00AD 04             INC    A
-00AE F0             MOVX   @DPTR,A
-00AF B41FD1         CJNE   A,#01FH,?FOR3
-                                           ; SOURCE LINE # 185 
-00B2 900000  R      MOV    DPTR,#i+01H
-00B5 E0             MOVX   A,@DPTR
-00B6 04             INC    A
-00B7 F0             MOVX   @DPTR,A
-00B8 B40CC1         CJNE   A,#00CH,?FOR2
-00BB         ?NXT8:
-                                           ; SOURCE LINE # 197 
-00BB 900000  R      MOV    DPTR,#PLCMemoryLogicInputs+01H
-00BE E0             MOVX   A,@DPTR
-00BF 900000  R      MOV    DPTR,#DI+01H
-00C2 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 198 
-00C3 900000  R      MOV    DPTR,#PLCMemoryLogicInputs
-00C6 E0             MOVX   A,@DPTR
-00C7 900000  R      MOV    DPTR,#DI
-00CA F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 199 
-00CB 900000  R      MOV    DPTR,#PLCMemoryLogicInputs+02H
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE  6
-
-00CE E0             MOVX   A,@DPTR
-00CF 900000  R      MOV    DPTR,#DI+02H
-00D2 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 200 
-00D3 900000  R      MOV    DPTR,#PLCMemoryLogicInputs+03H
-00D6 E0             MOVX   A,@DPTR
-00D7 900000  R      MOV    DPTR,#DI+03H
-00DA F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 203 
-00DB 120000  R      LCALL  ParseCOM
-                                           ; SOURCE LINE # 206 
-00DE 900000  R      MOV    DPTR,#PLCPulse1000
-00E1 E0             MOVX   A,@DPTR
-00E2 603C           JZ     ?NXT13
-                                           ; SOURCE LINE # 208 
-00E4 900000  R      MOV    DPTR,#nextaction
-00E7 E0             MOVX   A,@DPTR
-00E8 B4000C         CJNE   A,#000H,?NXT14
-00EB A3             INC    DPTR
-00EC E0             MOVX   A,@DPTR
-00ED B40207         CJNE   A,#002H,?NXT14
-                                           ; SOURCE LINE # 209 
-00F0 900000  R      MOV    DPTR,#nextaction
-00F3 E4             CLR    A
-00F4 F0             MOVX   @DPTR,A
-00F5 A3             INC    DPTR
-00F6 F0             MOVX   @DPTR,A
-00F7         ?NXT14:
-                                           ; SOURCE LINE # 211 
-00F7 900000  R      MOV    DPTR,#nextaction
-00FA E0             MOVX   A,@DPTR
-00FB FA             MOV    R2,A
-00FC A3             INC    DPTR
-00FD E0             MOVX   A,@DPTR
-00FE BA0008         CJNE   R2,#000H,?LAB8
-0101 600F           JZ     ?NXT15
-0103 14             DEC    A
-0104 6004           JZ     ?CASE4
-0106 14             DEC    A
-0107 6006           JZ     ?CASE5
-0109         ?LAB8:
-0109 22             RET    
-010A         ?CASE4:
-                                           ; SOURCE LINE # 235 
-010A 120000  R      LCALL  ManageHeatingOutputs
-                                           ; SOURCE LINE # 236 
-010D 8003           SJMP   ?NXT15
-010F         ?CASE5:
-                                           ; SOURCE LINE # 239 
-010F 120000  R      LCALL  ParseCOM
-0112         ?NXT15:
-                                           ; SOURCE LINE # 245 
-0112 900000  R      MOV    DPTR,#nextaction+01H
-0115 E0             MOVX   A,@DPTR
-0116 04             INC    A
-0117 F0             MOVX   @DPTR,A
-0118 900000  R      MOV    DPTR,#nextaction
-011B 7003           JNZ    ?NXT13
-011D E0             MOVX   A,@DPTR
-011E 04             INC    A
-011F F0             MOVX   @DPTR,A
-0120         ?NXT13:
-                                           ; SOURCE LINE # 247 
-0120 22             RET    
-
-            ; FUNCTION CustomFunction (END)
-
-            ; FUNCTION ParseCOM (BEGIN)
-                                           ; SOURCE LINE # 259 
-0000 900000  R      MOV    DPTR,#IOSerialPortA
-0003 E0             MOVX   A,@DPTR
-0004 FE             MOV    R6,A
-0005 A3             INC    DPTR
-0006 E0             MOVX   A,@DPTR
-0007 FF             MOV    R7,A
-0008 120000  R      LCALL  _SetTermIOVectors
-                                           ; SOURCE LINE # 260 
-000B 120000  R      LCALL  TermIOTick
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE  8
-
-                                           ; SOURCE LINE # 262 
-000E 120000  R      LCALL  GetRxChars
-0011 EE             MOV    A,R6
-0012 4F             ORL    A,R7
-0013 7003           JNZ    $ + 5
-0015 020000  R      LJMP   ?NXT21
-                                           ; SOURCE LINE # 266 
-0018 120000  R      LCALL  GetCh
-001B EF             MOV    A,R7
-001C 900000  R      MOV    DPTR,#c
-001F F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 269 
-0020 BF4803         CJNE   R7,#048H,?LAB36
-0023 020000  R      LJMP   ?CASE55
-0026         ?LAB36:
-0026 506D           JNC    ?LAB35
-0028 E0             MOVX   A,@DPTR
-0029 B43703         CJNE   A,#037H,?LAB38
-002C 020000  R      LJMP   ?CASE45
-002F         ?LAB38:
-002F 5037           JNC    ?LAB37
-0031 E0             MOVX   A,@DPTR
-0032 B43303         CJNE   A,#033H,?LAB40
-0035 020000  R      LJMP   ?CASE45
-0038         ?LAB40:
-0038 5017           JNC    ?LAB39
-003A E0             MOVX   A,@DPTR
-003B 24D0           ADD    A,#0D0H
-003D 7003           JNZ    $ + 5
-003F 020000  R      LJMP   ?CASE45
-0042 14             DEC    A
-0043 7003           JNZ    $ + 5
-0045 020000  R      LJMP   ?CASE45
-0048 14             DEC    A
-0049 7003           JNZ    $ + 5
-004B 020000  R      LJMP   ?CASE45
-004E 020000  R      LJMP   ?DEFAULT3
-0051         ?LAB39:
-0051 E0             MOVX   A,@DPTR
-0052 24CC           ADD    A,#0CCH
-0054 7003           JNZ    $ + 5
-0056 020000  R      LJMP   ?CASE45
-0059 14             DEC    A
-005A 7003           JNZ    $ + 5
-005C 020000  R      LJMP   ?CASE45
-005F 14             DEC    A
-0060 7003           JNZ    $ + 5
-0062 020000  R      LJMP   ?CASE45
-0065 020000  R      LJMP   ?DEFAULT3
-0068         ?LAB37:
-0068 E0             MOVX   A,@DPTR
-0069 B44203         CJNE   A,#042H,?LAB42
-006C 020000  R      LJMP   ?CASE47
-006F         ?LAB42:
-006F 5015           JNC    ?LAB41
-0071 E0             MOVX   A,@DPTR
-0072 24C8           ADD    A,#0C8H
-0074 7003           JNZ    $ + 5
-0076 020000  R      LJMP   ?CASE45
-0079 14             DEC    A
-007A 7003           JNZ    $ + 5
-007C 020000  R      LJMP   ?CASE45
-007F 24F8           ADD    A,#0F8H
-0081 6079           JZ     ?CASE47
-0083 020000  R      LJMP   ?DEFAULT3
-0086         ?LAB41:
-0086 E0             MOVX   A,@DPTR
-0087 24BD           ADD    A,#0BDH
-0089 605B           JZ     ?CASE55
-008B 14             DEC    A
-008C 6058           JZ     ?CASE55
-008E 24FD           ADD    A,#0FDH
-0090 606A           JZ     ?CASE47
-0092 020000  R      LJMP   ?DEFAULT3
-0095         ?LAB35:
-0095 E0             MOVX   A,@DPTR
-0096 B45902         CJNE   A,#059H,?LAB44
-0099 804B           SJMP   ?CASE55
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE  9
-
-009B         ?LAB44:
-009B 5026           JNC    ?LAB43
-009D E0             MOVX   A,@DPTR
-009E B44F02         CJNE   A,#04FH,?LAB46
-00A1 8043           SJMP   ?CASE55
-00A3         ?LAB46:
-00A3 500F           JNC    ?LAB45
-00A5 E0             MOVX   A,@DPTR
-00A6 24B7           ADD    A,#0B7H
-00A8 603C           JZ     ?CASE55
-00AA 24FC           ADD    A,#0FCH
-00AC 6038           JZ     ?CASE55
-00AE 14             DEC    A
-00AF 604B           JZ     ?CASE47
-00B1 020000  R      LJMP   ?DEFAULT3
-00B4         ?LAB45:
-00B4 E0             MOVX   A,@DPTR
-00B5 24AD           ADD    A,#0ADH
-00B7 606F           JZ     ?CASE57
-00B9 14             DEC    A
-00BA 606C           JZ     ?CASE57
-00BC 24FC           ADD    A,#0FCH
-00BE 603C           JZ     ?CASE47
-00C0 020000  R      LJMP   ?DEFAULT3
-00C3         ?LAB43:
-00C3 E0             MOVX   A,@DPTR
-00C4 B46D02         CJNE   A,#06DH,?LAB48
-00C7 801D           SJMP   ?CASE55
-00C9         ?LAB48:
-00C9 500F           JNC    ?LAB47
-00CB E0             MOVX   A,@DPTR
-00CC 249F           ADD    A,#09FH
-00CE 6042           JZ     ?CASE61
-00D0 14             DEC    A
-00D1 603F           JZ     ?CASE61
-00D3 24FB           ADD    A,#0FBH
-00D5 603B           JZ     ?CASE61
-00D7 020000  R      LJMP   ?DEFAULT3
-00DA         ?LAB47:
-00DA E0             MOVX   A,@DPTR
-00DB 2492           ADD    A,#092H
-00DD 6033           JZ     ?CASE61
-00DF 24F6           ADD    A,#0F6H
-00E1 602F           JZ     ?CASE61
-00E3 020000  R      LJMP   ?DEFAULT3
-00E6         ?CASE55:
-                                           ; SOURCE LINE # 279 
-00E6 900000  R      MOV    DPTR,#c
-00E9 E0             MOVX   A,@DPTR
-00EA 900000  R      MOV    DPTR,#cmd
-00ED F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 280 
-00EE 7402           MOV    A,#002H
-00F0 A3             INC    DPTR
-00F1 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 281 
-00F2 E4             CLR    A
-00F3 900000  R      MOV    DPTR,#parm1
-00F6 F0             MOVX   @DPTR,A
-00F7 900000  R      MOV    DPTR,#op_cnt
-00FA F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 282 
-00FB 22             RET    
-00FC         ?CASE47:
-                                           ; SOURCE LINE # 290 
-00FC 900000  R      MOV    DPTR,#c
-00FF E0             MOVX   A,@DPTR
-0100 900000  R      MOV    DPTR,#cmd
-0103 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 291 
-0104 7402           MOV    A,#002H
-0106 A3             INC    DPTR
-0107 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 292 
-0108 E4             CLR    A
-0109 900000  R      MOV    DPTR,#parm1
-010C F0             MOVX   @DPTR,A
-010D 900000  R      MOV    DPTR,#op_cnt
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 10
-
-0110 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 293 
-0111 22             RET    
-0112         ?CASE61:
-                                           ; SOURCE LINE # 301 
-0112 900000  R      MOV    DPTR,#c
-0115 E0             MOVX   A,@DPTR
-0116 900000  R      MOV    DPTR,#cmd
-0119 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 302 
-011A 7402           MOV    A,#002H
-011C A3             INC    DPTR
-011D F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 303 
-011E E4             CLR    A
-011F 900000  R      MOV    DPTR,#parm1
-0122 F0             MOVX   @DPTR,A
-0123 900000  R      MOV    DPTR,#op_cnt
-0126 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 304 
-0127 22             RET    
-0128         ?CASE57:
-                                           ; SOURCE LINE # 309 
-0128 900000  R      MOV    DPTR,#c
-012B E0             MOVX   A,@DPTR
-012C 900000  R      MOV    DPTR,#cmd
-012F F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 310 
-0130 FF             MOV    R7,A
-0131 900000  R      MOV    DPTR,#parm1
-0134 E0             MOVX   A,@DPTR
-0135 FD             MOV    R5,A
-0136 120000  R      LCALL  _ExecuteCmd
-                                           ; SOURCE LINE # 311 
-0139 E4             CLR    A
-013A 900000  R      MOV    DPTR,#parm1
-013D F0             MOVX   @DPTR,A
-013E 900000  R      MOV    DPTR,#cmd
-0141 F0             MOVX   @DPTR,A
-0142 900000  R      MOV    DPTR,#op_cnt
-0145 F0             MOVX   @DPTR,A
-0146 900000  R      MOV    DPTR,#op_len
-0149 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 312 
-014A 22             RET    
-014B         ?CASE45:
-                                           ; SOURCE LINE # 316 
-014B 900000  R      MOV    DPTR,#op_cnt
-014E E0             MOVX   A,@DPTR
-014F 04             INC    A
-0150 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 317 
-0151 900000  R      MOV    DPTR,#op_len
-0154 E0             MOVX   A,@DPTR
-0155 6016           JZ     ?LAB49
-0157 900000  R      MOV    DPTR,#cmd
-015A E0             MOVX   A,@DPTR
-015B 6010           JZ     ?LAB49
-015D 900000  R      MOV    DPTR,#op_cnt
-0160 E0             MOVX   A,@DPTR
-0161 FE             MOV    R6,A
-0162 F5F0           MOV    B,A
-0164 900000  R      MOV    DPTR,#op_len
-0167 E0             MOVX   A,@DPTR
-0168 B5F000         CJNE   A,B,?LAB51
-016B         ?LAB51:
-016B 5012           JNC    ?NXT23
-016D         ?LAB49:
-                                           ; SOURCE LINE # 319 
-016D E4             CLR    A
-016E 900000  R      MOV    DPTR,#parm1
-0171 F0             MOVX   @DPTR,A
-0172 900000  R      MOV    DPTR,#op_cnt
-0175 F0             MOVX   @DPTR,A
-0176 900000  R      MOV    DPTR,#op_len
-0179 F0             MOVX   @DPTR,A
-017A 900000  R      MOV    DPTR,#cmd
-017D F0             MOVX   @DPTR,A
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 11
-
-                                           ; SOURCE LINE # 322 
-017E 22             RET    
-017F         ?NXT23:
-                                           ; SOURCE LINE # 324 
-017F 900000  R      MOV    DPTR,#op_cnt
-0182 E0             MOVX   A,@DPTR
-0183 6401           XRL    A,#001H
-0185 700B           JNZ    ?NXT24
-                                           ; SOURCE LINE # 326 
-0187 900000  R      MOV    DPTR,#c
-018A E0             MOVX   A,@DPTR
-018B 24D0           ADD    A,#0D0H
-018D 900000  R      MOV    DPTR,#parm1
-0190 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 328 
-0191 22             RET    
-0192         ?NXT24:
-                                           ; SOURCE LINE # 330 
-0192 900000  R      MOV    DPTR,#op_cnt
-0195 E0             MOVX   A,@DPTR
-0196 6402           XRL    A,#002H
-0198 7031           JNZ    ?DEFAULT3
-                                           ; SOURCE LINE # 332 
-019A A3             INC    DPTR
-019B E0             MOVX   A,@DPTR
-019C 75F00A         MOV    B,#00AH
-019F A4             MUL    AB
-01A0 FA             MOV    R2,A
-01A1 900000  R      MOV    DPTR,#c
-01A4 E0             MOVX   A,@DPTR
-01A5 24D0           ADD    A,#0D0H
-01A7 2A             ADD    A,R2
-01A8 900000  R      MOV    DPTR,#parm1
-01AB F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 336 
-01AC 900000  R      MOV    DPTR,#cmd
-01AF E0             MOVX   A,@DPTR
-01B0 FF             MOV    R7,A
-01B1 900000  R      MOV    DPTR,#parm1
-01B4 E0             MOVX   A,@DPTR
-01B5 FD             MOV    R5,A
-01B6 120000  R      LCALL  _ExecuteCmd
-                                           ; SOURCE LINE # 337 
-01B9 E4             CLR    A
-01BA 900000  R      MOV    DPTR,#parm1
-01BD F0             MOVX   @DPTR,A
-01BE 900000  R      MOV    DPTR,#op_cnt
-01C1 F0             MOVX   @DPTR,A
-01C2 900000  R      MOV    DPTR,#op_len
-01C5 F0             MOVX   @DPTR,A
-01C6 900000  R      MOV    DPTR,#cmd
-01C9 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 345 
-01CA 22             RET    
-01CB         ?DEFAULT3:
-                                           ; SOURCE LINE # 341 
-01CB E4             CLR    A
-01CC 900000  R      MOV    DPTR,#parm1
-01CF F0             MOVX   @DPTR,A
-01D0 900000  R      MOV    DPTR,#op_cnt
-01D3 F0             MOVX   @DPTR,A
-01D4 900000  R      MOV    DPTR,#op_len
-01D7 F0             MOVX   @DPTR,A
-01D8 900000  R      MOV    DPTR,#cmd
-01DB F0             MOVX   @DPTR,A
-01DC         ?NXT21:
-                                           ; SOURCE LINE # 345 
-01DC 22             RET    
-
-            ; FUNCTION ParseCOM (END)
-
-            ; FUNCTION _ExecuteCmd (BEGIN)
-                                           ; SOURCE LINE # 347 
-0000 900000  R      MOV    DPTR,#cmd
-0003 EF             MOV    A,R7
-0004 F0             MOVX   @DPTR,A
-0005 A3             INC    DPTR
-0006 ED             MOV    A,R5
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 14
-
-0007 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 354 
-0008 900000  R      MOV    DPTR,#IOSerialPortA
-000B E0             MOVX   A,@DPTR
-000C FE             MOV    R6,A
-000D A3             INC    DPTR
-000E E0             MOVX   A,@DPTR
-000F FF             MOV    R7,A
-0010 120000  R      LCALL  _SetTermIOVectors
-                                           ; SOURCE LINE # 355 
-0013 120000  R      LCALL  TermIOTick
-                                           ; SOURCE LINE # 357 
-0016 7F00    R      MOV    R7,#LOW (RtcData) 
-0018 7E00    R      MOV    R6,#HIGH (RtcData) 
-001A 120000  R      LCALL  _GetRtc
-                                           ; SOURCE LINE # 359 
-001D 900000  R      MOV    DPTR,#cmd
-0020 E0             MOVX   A,@DPTR
-0021 B45303         CJNE   A,#053H,?LAB105
-0024 020000  R      LJMP   ?CASE96
-0027         ?LAB105:
-0027 504B           JNC    ?LAB104
-0029 E0             MOVX   A,@DPTR
-002A B44803         CJNE   A,#048H,?LAB107
-002D 020000  R      LJMP   ?CASE91
-0030         ?LAB107:
-0030 5024           JNC    ?LAB106
-0032 E0             MOVX   A,@DPTR
-0033 24BF           ADD    A,#0BFH
-0035 7003           JNZ    $ + 5
-0037 020000  R      LJMP   ?CASE87
-003A 14             DEC    A
-003B 7003           JNZ    $ + 5
-003D 020000  R      LJMP   ?CASE87
-0040 14             DEC    A
-0041 7003           JNZ    $ + 5
-0043 020000  R      LJMP   ?CASE88
-0046 14             DEC    A
-0047 7003           JNZ    $ + 5
-0049 020000  R      LJMP   ?CASE89
-004C 24FD           ADD    A,#0FDH
-004E 7003           JNZ    $ + 5
-0050 020000  R      LJMP   ?CASE87
-0053 020000  R      LJMP   ?NXT43
-0056         ?LAB106:
-0056 E0             MOVX   A,@DPTR
-0057 24B7           ADD    A,#0B7H
-0059 7003           JNZ    $ + 5
-005B 020000  R      LJMP   ?CASE92
-005E 24FC           ADD    A,#0FCH
-0060 7003           JNZ    $ + 5
-0062 020000  R      LJMP   ?CASE93
-0065 14             DEC    A
-0066 7003           JNZ    $ + 5
-0068 020000  R      LJMP   ?CASE87
-006B 14             DEC    A
-006C 7003           JNZ    $ + 5
-006E 020000  R      LJMP   ?CASE95
-0071 020000  R      LJMP   ?NXT43
-0074         ?LAB104:
-0074 E0             MOVX   A,@DPTR
-0075 B46203         CJNE   A,#062H,?LAB109
-0078 020000  R      LJMP   ?CASE101
-007B         ?LAB109:
-007B 501F           JNC    ?LAB108
-007D E0             MOVX   A,@DPTR
-007E 24AC           ADD    A,#0ACH
-0080 7003           JNZ    $ + 5
-0082 020000  R      LJMP   ?CASE97
-0085 24FC           ADD    A,#0FCH
-0087 7003           JNZ    $ + 5
-0089 020000  R      LJMP   ?CASE87
-008C 14             DEC    A
-008D 7003           JNZ    $ + 5
-008F 020000  R      LJMP   ?CASE99
-0092 24F8           ADD    A,#0F8H
-0094 7003           JNZ    $ + 5
-0096 020000  R      LJMP   ?CASE101
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 15
-
-0099 020000  R      LJMP   ?NXT43
-009C         ?LAB108:
-009C E0             MOVX   A,@DPTR
-009D 2499           ADD    A,#099H
-009F 7003           JNZ    $ + 5
-00A1 020000  R      LJMP   ?CASE101
-00A4 24FA           ADD    A,#0FAH
-00A6 602F           JZ     ?CASE103
-00A8 14             DEC    A
-00A9 7003           JNZ    $ + 5
-00AB 020000  R      LJMP   ?CASE101
-00AE 24F6           ADD    A,#0F6H
-00B0 7003           JNZ    $ + 5
-00B2 020000  R      LJMP   ?CASE101
-00B5 020000  R      LJMP   ?NXT43
-00B8         ?CASE91:
-                                           ; SOURCE LINE # 362 
-00B8 900000  R      MOV    DPTR,#parm1
-00BB E0             MOVX   A,@DPTR
-00BC B41701         CJNE   A,#017H,?LAB110
-00BF D3             SETB   C
-00C0         ?LAB110:
-00C0 4003           JC     ?NXT44
-                                           ; SOURCE LINE # 363 
-00C2 7FFF           MOV    R7,#0FFH
-                                           ; SOURCE LINE # 505 
-00C4 22             RET    
-00C5         ?NXT44:
-                                           ; SOURCE LINE # 364 
-00C5 900000  R      MOV    DPTR,#parm1
-00C8 E0             MOVX   A,@DPTR
-00C9 900000  R      MOV    DPTR,#RtcData+04H
-00CC F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 365 
-00CD 7E00    R      MOV    R6,#HIGH (RtcData) 
-00CF 7F00    R      MOV    R7,#LOW (RtcData) 
-00D1 120000  R      LCALL  _SetRtc
-                                           ; SOURCE LINE # 366 
-00D4 020000  R      LJMP   ?NXT43
-00D7         ?CASE103:
-                                           ; SOURCE LINE # 369 
-00D7 900000  R      MOV    DPTR,#parm1
-00DA E0             MOVX   A,@DPTR
-00DB B43B01         CJNE   A,#03BH,?LAB113
-00DE D3             SETB   C
-00DF         ?LAB113:
-00DF 4003           JC     ?NXT45
-                                           ; SOURCE LINE # 370 
-00E1 7FFF           MOV    R7,#0FFH
-                                           ; SOURCE LINE # 505 
-00E3 22             RET    
-00E4         ?NXT45:
-                                           ; SOURCE LINE # 371 
-00E4 900000  R      MOV    DPTR,#parm1
-00E7 E0             MOVX   A,@DPTR
-00E8 900000  R      MOV    DPTR,#RtcData+05H
-00EB F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 372 
-00EC 7E00    R      MOV    R6,#HIGH (RtcData) 
-00EE 7F00    R      MOV    R7,#LOW (RtcData) 
-00F0 120000  R      LCALL  _SetRtc
-                                           ; SOURCE LINE # 373 
-00F3 020000  R      LJMP   ?NXT43
-00F6         ?CASE93:
-                                           ; SOURCE LINE # 376 
-00F6 900000  R      MOV    DPTR,#parm1
-00F9 E0             MOVX   A,@DPTR
-00FA FB             MOV    R3,A
-00FB 7A00           MOV    R2,#000H
-00FD B40001         CJNE   A,#000H,?LAB117
-0100 D3             SETB   C
-0101         ?LAB117:
-0101 4017           JC     ?NXT46
-0103 B40D00         CJNE   A,#00DH,?LAB119
-0106         ?LAB119:
-0106 5012           JNC    ?NXT46
-                                           ; SOURCE LINE # 378 
-0108 900000  R      MOV    DPTR,#parm1
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 16
-
-010B E0             MOVX   A,@DPTR
-010C 900000  R      MOV    DPTR,#RtcData+01H
-010F F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 379 
-0110 7E00    R      MOV    R6,#HIGH (RtcData) 
-0112 7F00    R      MOV    R7,#LOW (RtcData) 
-0114 120000  R      LCALL  _SetRtc
-                                           ; SOURCE LINE # 380 
-0117 020000  R      LJMP   ?NXT43
-011A         ?NXT46:
-                                           ; SOURCE LINE # 382 
-011A 7FFF           MOV    R7,#0FFH
-                                           ; SOURCE LINE # 505 
-011C 22             RET    
-011D         ?CASE99:
-                                           ; SOURCE LINE # 385 
-011D 900000  R      MOV    DPTR,#parm1
-0120 E0             MOVX   A,@DPTR
-0121 B46301         CJNE   A,#063H,?LAB122
-0124 D3             SETB   C
-0125         ?LAB122:
-0125 4003           JC     ?NXT47
-                                           ; SOURCE LINE # 386 
-0127 7FFF           MOV    R7,#0FFH
-                                           ; SOURCE LINE # 505 
-0129 22             RET    
-012A         ?NXT47:
-                                           ; SOURCE LINE # 387 
-012A 900000  R      MOV    DPTR,#parm1
-012D E0             MOVX   A,@DPTR
-012E 900000  R      MOV    DPTR,#RtcData
-0131 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 388 
-0132 7E00    R      MOV    R6,#HIGH (RtcData) 
-0134 7F00    R      MOV    R7,#LOW (RtcData) 
-0136 120000  R      LCALL  _SetRtc
-                                           ; SOURCE LINE # 389 
-0139 020000  R      LJMP   ?NXT43
-013C         ?CASE88:
-                                           ; SOURCE LINE # 392 
-013C 900000  R      MOV    DPTR,#parm1
-013F E0             MOVX   A,@DPTR
-0140 B41701         CJNE   A,#017H,?LAB125
-0143 D3             SETB   C
-0144         ?LAB125:
-0144 400C           JC     ?NXT48
-                                           ; SOURCE LINE # 394 
-0146 7B05           MOV    R3,#005H
-0148 7A00    R      MOV    R2,#HIGH(?STR?CFILE?BASE)
-014A 7900    R      MOV    R1,#LOW(?STR?CFILE?BASE)
-014C 120000  R      LCALL  ?printf
-                                           ; SOURCE LINE # 395 
-014F 7FFF           MOV    R7,#0FFH
-                                           ; SOURCE LINE # 505 
-0151 22             RET    
-0152         ?NXT48:
-                                           ; SOURCE LINE # 397 
-0152 900000  R      MOV    DPTR,#parm1
-0155 E0             MOVX   A,@DPTR
-0156 2400    R      ADD    A,#LOW comfortP1
-0158 F582           MOV    DPL,A
-015A E4             CLR    A
-015B 3400    R      ADDC   A,#HIGH comfortP1
-015D F583           MOV    DPH,A
-015F E0             MOVX   A,@DPTR
-0160 FD             MOV    R5,A
-0161 33             RLC    A
-0162 95E0           SUBB   A,ACC
-0164 C0E0           PUSH   ACC
-0166 C005           PUSH   AR5
-0168 900000  R      MOV    DPTR,#parm1
-016B E0             MOVX   A,@DPTR
-016C FD             MOV    R5,A
-016D E4             CLR    A
-016E C0E0           PUSH   ACC
-0170 C005           PUSH   AR5
-0172 E0             MOVX   A,@DPTR
-0173 FD             MOV    R5,A
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 17
-
-0174 E4             CLR    A
-0175 C0E0           PUSH   ACC
-0177 C005           PUSH   AR5
-0179 7B05           MOV    R3,#005H
-017B 7A00    R      MOV    R2,#HIGH(?STR?CFILE?BASE + 043H)
-017D 7900    R      MOV    R1,#LOW(?STR?CFILE?BASE + 043H)
-017F 120000  R      LCALL  ?printf
-0182 74FA           MOV    A,#0FAH
-0184 2581           ADD    A,SP
-0186 F581           MOV    SP,A
-                                           ; SOURCE LINE # 398 
-0188 020000  R      LJMP   ?NXT43
-018B         ?CASE89:
-                                           ; SOURCE LINE # 401 
-018B 900000  R      MOV    DPTR,#parm1
-018E E0             MOVX   A,@DPTR
-018F B41701         CJNE   A,#017H,?LAB128
-0192 D3             SETB   C
-0193         ?LAB128:
-0193 400C           JC     ?NXT49
-                                           ; SOURCE LINE # 403 
-0195 7B05           MOV    R3,#005H
-0197 7A00    R      MOV    R2,#HIGH(?STR?CFILE?BASE + 066H)
-0199 7900    R      MOV    R1,#LOW(?STR?CFILE?BASE + 066H)
-019B 120000  R      LCALL  ?printf
-                                           ; SOURCE LINE # 404 
-019E 7FFF           MOV    R7,#0FFH
-                                           ; SOURCE LINE # 505 
-01A0 22             RET    
-01A1         ?NXT49:
-                                           ; SOURCE LINE # 406 
-01A1 900000  R      MOV    DPTR,#parm1
-01A4 E0             MOVX   A,@DPTR
-01A5 2400    R      ADD    A,#LOW comfortP0
-01A7 F582           MOV    DPL,A
-01A9 E4             CLR    A
-01AA 3400    R      ADDC   A,#HIGH comfortP0
-01AC F583           MOV    DPH,A
-01AE E0             MOVX   A,@DPTR
-01AF FD             MOV    R5,A
-01B0 33             RLC    A
-01B1 95E0           SUBB   A,ACC
-01B3 C0E0           PUSH   ACC
-01B5 C005           PUSH   AR5
-01B7 900000  R      MOV    DPTR,#parm1
-01BA E0             MOVX   A,@DPTR
-01BB FD             MOV    R5,A
-01BC E4             CLR    A
-01BD C0E0           PUSH   ACC
-01BF C005           PUSH   AR5
-01C1 E0             MOVX   A,@DPTR
-01C2 FD             MOV    R5,A
-01C3 E4             CLR    A
-01C4 C0E0           PUSH   ACC
-01C6 C005           PUSH   AR5
-01C8 7B05           MOV    R3,#005H
-01CA 7A00    R      MOV    R2,#HIGH(?STR?CFILE?BASE + 0A9H)
-01CC 7900    R      MOV    R1,#LOW(?STR?CFILE?BASE + 0A9H)
-01CE 120000  R      LCALL  ?printf
-01D1 74FA           MOV    A,#0FAH
-01D3 2581           ADD    A,SP
-01D5 F581           MOV    SP,A
-                                           ; SOURCE LINE # 407 
-01D7 020000  R      LJMP   ?NXT43
-01DA         ?CASE92:
-                                           ; SOURCE LINE # 410 
-01DA 900000  R      MOV    DPTR,#parm1
-01DD E0             MOVX   A,@DPTR
-01DE B40F01         CJNE   A,#00FH,?LAB131
-01E1 D3             SETB   C
-01E2         ?LAB131:
-01E2 400C           JC     ?NXT50
-                                           ; SOURCE LINE # 412 
-01E4 7B05           MOV    R3,#005H
-01E6 7A00    R      MOV    R2,#HIGH(?STR?CFILE?BASE + 0CCH)
-01E8 7900    R      MOV    R1,#LOW(?STR?CFILE?BASE + 0CCH)
-01EA 120000  R      LCALL  ?printf
-                                           ; SOURCE LINE # 413 
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 18
-
-01ED 7FFF           MOV    R7,#0FFH
-                                           ; SOURCE LINE # 505 
-01EF 22             RET    
-01F0         ?NXT50:
-                                           ; SOURCE LINE # 416 
-01F0 900000  R      MOV    DPTR,#parm1
-01F3 E0             MOVX   A,@DPTR
-01F4 2400    R      ADD    A,#LOW DI
-01F6 F582           MOV    DPL,A
-01F8 E4             CLR    A
-01F9 3400    R      ADDC   A,#HIGH DI
-01FB F583           MOV    DPH,A
-01FD E0             MOVX   A,@DPTR
-01FE FD             MOV    R5,A
-01FF E4             CLR    A
-0200 C0E0           PUSH   ACC
-0202 C005           PUSH   AR5
-0204 900000  R      MOV    DPTR,#parm1
-0207 E0             MOVX   A,@DPTR
-0208 FD             MOV    R5,A
-0209 E4             CLR    A
-020A C0E0           PUSH   ACC
-020C C005           PUSH   AR5
-020E 7B05           MOV    R3,#005H
-0210 7A00    R      MOV    R2,#HIGH(?STR?CFILE?BASE + 010BH)
-0212 7900    R      MOV    R1,#LOW(?STR?CFILE?BASE + 010BH)
-0214 120000  R      LCALL  ?printf
-0217 74FC           MOV    A,#0FCH
-0219 2581           ADD    A,SP
-021B F581           MOV    SP,A
-                                           ; SOURCE LINE # 417 
-021D 020000  R      LJMP   ?NXT43
-0220         ?CASE95:
-                                           ; SOURCE LINE # 420 
-0220 900000  R      MOV    DPTR,#parm1
-0223 E0             MOVX   A,@DPTR
-0224 B40701         CJNE   A,#007H,?LAB134
-0227 D3             SETB   C
-0228         ?LAB134:
-0228 400C           JC     ?NXT51
-                                           ; SOURCE LINE # 422 
-022A 7B05           MOV    R3,#005H
-022C 7A00    R      MOV    R2,#HIGH(?STR?CFILE?BASE + 0119H)
-022E 7900    R      MOV    R1,#LOW(?STR?CFILE?BASE + 0119H)
-0230 120000  R      LCALL  ?printf
-                                           ; SOURCE LINE # 423 
-0233 7FFF           MOV    R7,#0FFH
-                                           ; SOURCE LINE # 505 
-0235 22             RET    
-0236         ?NXT51:
-                                           ; SOURCE LINE # 425 
-0236 900000  R      MOV    DPTR,#parm1
-0239 E0             MOVX   A,@DPTR
-023A 2400    R      ADD    A,#LOW PLCMemoryLogicOutputs
-023C F582           MOV    DPL,A
-023E E4             CLR    A
-023F 3400    R      ADDC   A,#HIGH PLCMemoryLogicOutputs
-0241 F583           MOV    DPH,A
-0243 E0             MOVX   A,@DPTR
-0244 FD             MOV    R5,A
-0245 E4             CLR    A
-0246 C0E0           PUSH   ACC
-0248 C005           PUSH   AR5
-024A 900000  R      MOV    DPTR,#parm1
-024D E0             MOVX   A,@DPTR
-024E FD             MOV    R5,A
-024F E4             CLR    A
-0250 C0E0           PUSH   ACC
-0252 C005           PUSH   AR5
-0254 7B05           MOV    R3,#005H
-0256 7A00    R      MOV    R2,#HIGH(?STR?CFILE?BASE + 0157H)
-0258 7900    R      MOV    R1,#LOW(?STR?CFILE?BASE + 0157H)
-025A 120000  R      LCALL  ?printf
-025D 74FC           MOV    A,#0FCH
-025F 2581           ADD    A,SP
-0261 F581           MOV    SP,A
-                                           ; SOURCE LINE # 426 
-0263 020000  R      LJMP   ?NXT43
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 19
-
-0266         ?CASE96:
-                                           ; SOURCE LINE # 446 
-0266 E4             CLR    A
-0267 900000  R      MOV    DPTR,#i
-026A F0             MOVX   @DPTR,A
-026B         ?FOR7:
-026B 900000  R      MOV    DPTR,#i
-026E E0             MOVX   A,@DPTR
-026F FD             MOV    R5,A
-0270 33             RLC    A
-0271 95E0           SUBB   A,ACC
-0273 FC             MOV    R4,A
-0274 ED             MOV    A,R5
-0275 2400    R      ADD    A,#LOW comfortP0
-0277 F582           MOV    DPL,A
-0279 EC             MOV    A,R4
-027A 3400    R      ADDC   A,#HIGH comfortP0
-027C F583           MOV    DPH,A
-027E E0             MOVX   A,@DPTR
-027F FD             MOV    R5,A
-0280 33             RLC    A
-0281 95E0           SUBB   A,ACC
-0283 C0E0           PUSH   ACC
-0285 C005           PUSH   AR5
-0287 7B05           MOV    R3,#005H
-0289 7A00    R      MOV    R2,#HIGH(?STR?CFILE?BASE + 0166H)
-028B 7900    R      MOV    R1,#LOW(?STR?CFILE?BASE + 0166H)
-028D 120000  R      LCALL  ?printf
-0290 1581           DEC    SP
-0292 1581           DEC    SP
-0294 900000  R      MOV    DPTR,#i
-0297 E0             MOVX   A,@DPTR
-0298 04             INC    A
-0299 F0             MOVX   @DPTR,A
-029A B418CE         CJNE   A,#018H,?FOR7
-                                           ; SOURCE LINE # 447 
-029D E4             CLR    A
-029E F0             MOVX   @DPTR,A
-029F         ?FOR8:
-029F 900000  R      MOV    DPTR,#i
-02A2 E0             MOVX   A,@DPTR
-02A3 FD             MOV    R5,A
-02A4 33             RLC    A
-02A5 95E0           SUBB   A,ACC
-02A7 FC             MOV    R4,A
-02A8 ED             MOV    A,R5
-02A9 2400    R      ADD    A,#LOW comfortP1
-02AB F582           MOV    DPL,A
-02AD EC             MOV    A,R4
-02AE 3400    R      ADDC   A,#HIGH comfortP1
-02B0 F583           MOV    DPH,A
-02B2 E0             MOVX   A,@DPTR
-02B3 FD             MOV    R5,A
-02B4 33             RLC    A
-02B5 95E0           SUBB   A,ACC
-02B7 C0E0           PUSH   ACC
-02B9 C005           PUSH   AR5
-02BB 7B05           MOV    R3,#005H
-02BD 7A00    R      MOV    R2,#HIGH(?STR?CFILE?BASE + 0166H)
-02BF 7900    R      MOV    R1,#LOW(?STR?CFILE?BASE + 0166H)
-02C1 120000  R      LCALL  ?printf
-02C4 1581           DEC    SP
-02C6 1581           DEC    SP
-02C8 900000  R      MOV    DPTR,#i
-02CB E0             MOVX   A,@DPTR
-02CC 04             INC    A
-02CD F0             MOVX   @DPTR,A
-02CE B418CE         CJNE   A,#018H,?FOR8
-                                           ; SOURCE LINE # 454 
-02D1 E4             CLR    A
-02D2 F0             MOVX   @DPTR,A
-02D3         ?FOR9:
-02D3 900000  R      MOV    DPTR,#i
-02D6 E0             MOVX   A,@DPTR
-02D7 FD             MOV    R5,A
-02D8 33             RLC    A
-02D9 95E0           SUBB   A,ACC
-02DB FC             MOV    R4,A
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 20
-
-02DC ED             MOV    A,R5
-02DD 2400    R      ADD    A,#LOW DI
-02DF F582           MOV    DPL,A
-02E1 EC             MOV    A,R4
-02E2 3400    R      ADDC   A,#HIGH DI
-02E4 F583           MOV    DPH,A
-02E6 E0             MOVX   A,@DPTR
-02E7 FD             MOV    R5,A
-02E8 E4             CLR    A
-02E9 C0E0           PUSH   ACC
-02EB C005           PUSH   AR5
-02ED 7B05           MOV    R3,#005H
-02EF 7A00    R      MOV    R2,#HIGH(?STR?CFILE?BASE + 0169H)
-02F1 7900    R      MOV    R1,#LOW(?STR?CFILE?BASE + 0169H)
-02F3 120000  R      LCALL  ?printf
-02F6 1581           DEC    SP
-02F8 1581           DEC    SP
-02FA 900000  R      MOV    DPTR,#i
-02FD E0             MOVX   A,@DPTR
-02FE 04             INC    A
-02FF F0             MOVX   @DPTR,A
-0300 B410D0         CJNE   A,#010H,?FOR9
-                                           ; SOURCE LINE # 457 
-0303 900000  R      MOV    DPTR,#PLCMemoryLogicOutputs+03H
-0306 E0             MOVX   A,@DPTR
-0307 FD             MOV    R5,A
-0308 E4             CLR    A
-0309 C0E0           PUSH   ACC
-030B C005           PUSH   AR5
-030D 900000  R      MOV    DPTR,#PLCMemoryLogicOutputs+02H
-0310 E0             MOVX   A,@DPTR
-0311 FD             MOV    R5,A
-0312 E4             CLR    A
-0313 C0E0           PUSH   ACC
-0315 C005           PUSH   AR5
-0317 900000  R      MOV    DPTR,#PLCMemoryLogicOutputs+01H
-031A E0             MOVX   A,@DPTR
-031B FD             MOV    R5,A
-031C E4             CLR    A
-031D C0E0           PUSH   ACC
-031F C005           PUSH   AR5
-0321 900000  R      MOV    DPTR,#PLCMemoryLogicOutputs
-0324 E0             MOVX   A,@DPTR
-0325 FD             MOV    R5,A
-0326 E4             CLR    A
-0327 C0E0           PUSH   ACC
-0329 C005           PUSH   AR5
-032B 7B05           MOV    R3,#005H
-032D 7A00    R      MOV    R2,#HIGH(?STR?CFILE?BASE + 016CH)
-032F 7900    R      MOV    R1,#LOW(?STR?CFILE?BASE + 016CH)
-0331 120000  R      LCALL  ?printf
-0334 74F8           MOV    A,#0F8H
-0336 2581           ADD    A,SP
-0338 F581           MOV    SP,A
-                                           ; SOURCE LINE # 458 
-033A 900000  R      MOV    DPTR,#PLCMemoryLogicOutputs+07H
-033D E0             MOVX   A,@DPTR
-033E FD             MOV    R5,A
-033F E4             CLR    A
-0340 C0E0           PUSH   ACC
-0342 C005           PUSH   AR5
-0344 900000  R      MOV    DPTR,#PLCMemoryLogicOutputs+06H
-0347 E0             MOVX   A,@DPTR
-0348 FD             MOV    R5,A
-0349 E4             CLR    A
-034A C0E0           PUSH   ACC
-034C C005           PUSH   AR5
-034E 900000  R      MOV    DPTR,#PLCMemoryLogicOutputs+05H
-0351 E0             MOVX   A,@DPTR
-0352 FD             MOV    R5,A
-0353 E4             CLR    A
-0354 C0E0           PUSH   ACC
-0356 C005           PUSH   AR5
-0358 900000  R      MOV    DPTR,#PLCMemoryLogicOutputs+04H
-035B E0             MOVX   A,@DPTR
-035C FD             MOV    R5,A
-035D E4             CLR    A
-035E C0E0           PUSH   ACC
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 21
-
-0360 C005           PUSH   AR5
-0362 7B05           MOV    R3,#005H
-0364 7A00    R      MOV    R2,#HIGH(?STR?CFILE?BASE + 016CH)
-0366 7900    R      MOV    R1,#LOW(?STR?CFILE?BASE + 016CH)
-0368 120000  R      LCALL  ?printf
-036B 74F8           MOV    A,#0F8H
-036D 2581           ADD    A,SP
-036F F581           MOV    SP,A
-                                           ; SOURCE LINE # 462 
-0371 900000  R      MOV    DPTR,#RtcPLCSTARTTime+05H
-0374 E0             MOVX   A,@DPTR
-0375 FD             MOV    R5,A
-0376 E4             CLR    A
-0377 C0E0           PUSH   ACC
-0379 C005           PUSH   AR5
-037B 900000  R      MOV    DPTR,#RtcPLCSTARTTime+04H
-037E E0             MOVX   A,@DPTR
-037F FD             MOV    R5,A
-0380 E4             CLR    A
-0381 C0E0           PUSH   ACC
-0383 C005           PUSH   AR5
-0385 900000  R      MOV    DPTR,#RtcPLCSTARTTime
-0388 E0             MOVX   A,@DPTR
-0389 FD             MOV    R5,A
-038A E4             CLR    A
-038B C0E0           PUSH   ACC
-038D C005           PUSH   AR5
-038F A3             INC    DPTR
-0390 E0             MOVX   A,@DPTR
-0391 FD             MOV    R5,A
-0392 E4             CLR    A
-0393 C0E0           PUSH   ACC
-0395 C005           PUSH   AR5
-0397 A3             INC    DPTR
-0398 E0             MOVX   A,@DPTR
-0399 FD             MOV    R5,A
-039A E4             CLR    A
-039B C0E0           PUSH   ACC
-039D C005           PUSH   AR5
-039F 7B05           MOV    R3,#005H
-03A1 7A00    R      MOV    R2,#HIGH(?STR?CFILE?BASE + 0175H)
-03A3 7900    R      MOV    R1,#LOW(?STR?CFILE?BASE + 0175H)
-03A5 120000  R      LCALL  ?printf
-03A8 74F6           MOV    A,#0F6H
-03AA 2581           ADD    A,SP
-03AC F581           MOV    SP,A
-                                           ; SOURCE LINE # 463 
-03AE 900000  R      MOV    DPTR,#RtcONTime+05H
-03B1 E0             MOVX   A,@DPTR
-03B2 FD             MOV    R5,A
-03B3 E4             CLR    A
-03B4 C0E0           PUSH   ACC
-03B6 C005           PUSH   AR5
-03B8 900000  R      MOV    DPTR,#RtcONTime+04H
-03BB E0             MOVX   A,@DPTR
-03BC FD             MOV    R5,A
-03BD E4             CLR    A
-03BE C0E0           PUSH   ACC
-03C0 C005           PUSH   AR5
-03C2 900000  R      MOV    DPTR,#RtcONTime
-03C5 E0             MOVX   A,@DPTR
-03C6 FD             MOV    R5,A
-03C7 E4             CLR    A
-03C8 C0E0           PUSH   ACC
-03CA C005           PUSH   AR5
-03CC A3             INC    DPTR
-03CD E0             MOVX   A,@DPTR
-03CE FD             MOV    R5,A
-03CF E4             CLR    A
-03D0 C0E0           PUSH   ACC
-03D2 C005           PUSH   AR5
-03D4 A3             INC    DPTR
-03D5 E0             MOVX   A,@DPTR
-03D6 FD             MOV    R5,A
-03D7 E4             CLR    A
-03D8 C0E0           PUSH   ACC
-03DA C005           PUSH   AR5
-03DC 7B05           MOV    R3,#005H
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 22
-
-03DE 7A00    R      MOV    R2,#HIGH(?STR?CFILE?BASE + 0195H)
-03E0 7900    R      MOV    R1,#LOW(?STR?CFILE?BASE + 0195H)
-03E2 120000  R      LCALL  ?printf
-03E5 74F6           MOV    A,#0F6H
-03E7 2581           ADD    A,SP
-03E9 F581           MOV    SP,A
-                                           ; SOURCE LINE # 464 
-03EB 900000  R      MOV    DPTR,#TotMinutiON
-03EE E0             MOVX   A,@DPTR
-03EF C0E0           PUSH   ACC
-03F1 A3             INC    DPTR
-03F2 E0             MOVX   A,@DPTR
-03F3 C0E0           PUSH   ACC
-03F5 7B05           MOV    R3,#005H
-03F7 7A00    R      MOV    R2,#HIGH(?STR?CFILE?BASE + 01B9H)
-03F9 7900    R      MOV    R1,#LOW(?STR?CFILE?BASE + 01B9H)
-03FB 120000  R      LCALL  ?printf
-03FE 1581           DEC    SP
-0400 1581           DEC    SP
-                                           ; SOURCE LINE # 466 
-0402 7B05           MOV    R3,#005H
-0404 7A00    R      MOV    R2,#HIGH(?STR?CFILE?BASE + 01CCH)
-0406 7900    R      MOV    R1,#LOW(?STR?CFILE?BASE + 01CCH)
-0408 120000  R      LCALL  ?printf
-                                           ; SOURCE LINE # 468 
-040B 020000  R      LJMP   ?NXT43
-040E         ?CASE97:
-                                           ; SOURCE LINE # 471 
-040E 900000  R      MOV    DPTR,#RtcData+06H
-0411 E0             MOVX   A,@DPTR
-0412 FD             MOV    R5,A
-0413 E4             CLR    A
-0414 C0E0           PUSH   ACC
-0416 C005           PUSH   AR5
-0418 900000  R      MOV    DPTR,#RtcData+05H
-041B E0             MOVX   A,@DPTR
-041C FD             MOV    R5,A
-041D E4             CLR    A
-041E C0E0           PUSH   ACC
-0420 C005           PUSH   AR5
-0422 900000  R      MOV    DPTR,#RtcData+04H
-0425 E0             MOVX   A,@DPTR
-0426 FD             MOV    R5,A
-0427 E4             CLR    A
-0428 C0E0           PUSH   ACC
-042A C005           PUSH   AR5
-042C 900000  R      MOV    DPTR,#RtcData
-042F E0             MOVX   A,@DPTR
-0430 FD             MOV    R5,A
-0431 E4             CLR    A
-0432 C0E0           PUSH   ACC
-0434 C005           PUSH   AR5
-0436 A3             INC    DPTR
-0437 E0             MOVX   A,@DPTR
-0438 FD             MOV    R5,A
-0439 E4             CLR    A
-043A C0E0           PUSH   ACC
-043C C005           PUSH   AR5
-043E A3             INC    DPTR
-043F E0             MOVX   A,@DPTR
-0440 FD             MOV    R5,A
-0441 E4             CLR    A
-0442 C0E0           PUSH   ACC
-0444 C005           PUSH   AR5
-0446 7B05           MOV    R3,#005H
-0448 7A00    R      MOV    R2,#HIGH(?STR?CFILE?BASE + 01CEH)
-044A 7900    R      MOV    R1,#LOW(?STR?CFILE?BASE + 01CEH)
-044C 120000  R      LCALL  ?printf
-044F 74F4           MOV    A,#0F4H
-0451 2581           ADD    A,SP
-0453 F581           MOV    SP,A
-                                           ; SOURCE LINE # 472 
-0455 020000  R      LJMP   ?NXT43
-0458         ?CASE87:
-                                           ; SOURCE LINE # 480 
-0458 900000  R      MOV    DPTR,#parm1
-045B E0             MOVX   A,@DPTR
-045C B41701         CJNE   A,#017H,?LAB137
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 23
-
-045F D3             SETB   C
-0460         ?LAB137:
-0460 4023           JC     ?NXT58
-                                           ; SOURCE LINE # 482 
-0462 900000  R      MOV    DPTR,#cmd
-0465 E0             MOVX   A,@DPTR
-0466 FD             MOV    R5,A
-0467 E4             CLR    A
-0468 C0E0           PUSH   ACC
-046A C005           PUSH   AR5
-046C E0             MOVX   A,@DPTR
-046D FD             MOV    R5,A
-046E E4             CLR    A
-046F C0E0           PUSH   ACC
-0471 C005           PUSH   AR5
-0473 7B05           MOV    R3,#005H
-0475 7A00    R      MOV    R2,#HIGH(?STR?CFILE?BASE + 01F5H)
-0477 7900    R      MOV    R1,#LOW(?STR?CFILE?BASE + 01F5H)
-0479 120000  R      LCALL  ?printf
-047C 74FC           MOV    A,#0FCH
-047E 2581           ADD    A,SP
-0480 F581           MOV    SP,A
-                                           ; SOURCE LINE # 483 
-0482 7FFF           MOV    R7,#0FFH
-                                           ; SOURCE LINE # 505 
-0484 22             RET    
-0485         ?NXT58:
-                                           ; SOURCE LINE # 485 
-0485 900000  R      MOV    DPTR,#cmd
-0488 E0             MOVX   A,@DPTR
-0489 FC             MOV    R4,A
-048A A3             INC    DPTR
-048B E0             MOVX   A,@DPTR
-048C 2400    R      ADD    A,#LOW comfortP1
-048E F582           MOV    DPL,A
-0490 E4             CLR    A
-0491 3400    R      ADDC   A,#HIGH comfortP1
-0493 F583           MOV    DPH,A
-0495 EC             MOV    A,R4
-0496 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 486 
-0497 900000  R      MOV    DPTR,#parm1
-049A E0             MOVX   A,@DPTR
-049B FD             MOV    R5,A
-049C E4             CLR    A
-049D C0E0           PUSH   ACC
-049F C005           PUSH   AR5
-04A1 E0             MOVX   A,@DPTR
-04A2 FD             MOV    R5,A
-04A3 E4             CLR    A
-04A4 C0E0           PUSH   ACC
-04A6 C005           PUSH   AR5
-04A8 E0             MOVX   A,@DPTR
-04A9 2400    R      ADD    A,#LOW comfortP1
-04AB F582           MOV    DPL,A
-04AD E4             CLR    A
-04AE 3400    R      ADDC   A,#HIGH comfortP1
-04B0 F583           MOV    DPH,A
-04B2 E0             MOVX   A,@DPTR
-04B3 FD             MOV    R5,A
-04B4 33             RLC    A
-04B5 95E0           SUBB   A,ACC
-04B7 C0E0           PUSH   ACC
-04B9 C005           PUSH   AR5
-04BB 7B05           MOV    R3,#005H
-04BD 7A00    R      MOV    R2,#HIGH(?STR?CFILE?BASE + 023AH)
-04BF 7900    R      MOV    R1,#LOW(?STR?CFILE?BASE + 023AH)
-04C1 120000  R      LCALL  ?printf
-04C4 74FA           MOV    A,#0FAH
-04C6 2581           ADD    A,SP
-04C8 F581           MOV    SP,A
-                                           ; SOURCE LINE # 487 
-04CA 8074           SJMP   ?NXT43
-04CC         ?CASE101:
-                                           ; SOURCE LINE # 495 
-04CC 900000  R      MOV    DPTR,#parm1
-04CF E0             MOVX   A,@DPTR
-04D0 B41701         CJNE   A,#017H,?LAB140
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 24
-
-04D3 D3             SETB   C
-04D4         ?LAB140:
-04D4 4023           JC     ?NXT59
-                                           ; SOURCE LINE # 497 
-04D6 900000  R      MOV    DPTR,#cmd
-04D9 E0             MOVX   A,@DPTR
-04DA FD             MOV    R5,A
-04DB E4             CLR    A
-04DC C0E0           PUSH   ACC
-04DE C005           PUSH   AR5
-04E0 E0             MOVX   A,@DPTR
-04E1 FD             MOV    R5,A
-04E2 E4             CLR    A
-04E3 C0E0           PUSH   ACC
-04E5 C005           PUSH   AR5
-04E7 7B05           MOV    R3,#005H
-04E9 7A00    R      MOV    R2,#HIGH(?STR?CFILE?BASE + 01F5H)
-04EB 7900    R      MOV    R1,#LOW(?STR?CFILE?BASE + 01F5H)
-04ED 120000  R      LCALL  ?printf
-04F0 74FC           MOV    A,#0FCH
-04F2 2581           ADD    A,SP
-04F4 F581           MOV    SP,A
-                                           ; SOURCE LINE # 498 
-04F6 7FFF           MOV    R7,#0FFH
-                                           ; SOURCE LINE # 505 
-04F8 22             RET    
-04F9         ?NXT59:
-                                           ; SOURCE LINE # 500 
-04F9 900000  R      MOV    DPTR,#cmd
-04FC E0             MOVX   A,@DPTR
-04FD 24E0           ADD    A,#0E0H
-04FF FC             MOV    R4,A
-0500 A3             INC    DPTR
-0501 E0             MOVX   A,@DPTR
-0502 2400    R      ADD    A,#LOW comfortP0
-0504 F582           MOV    DPL,A
-0506 E4             CLR    A
-0507 3400    R      ADDC   A,#HIGH comfortP0
-0509 F583           MOV    DPH,A
-050B EC             MOV    A,R4
-050C F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 501 
-050D 900000  R      MOV    DPTR,#parm1
-0510 E0             MOVX   A,@DPTR
-0511 FD             MOV    R5,A
-0512 E4             CLR    A
-0513 C0E0           PUSH   ACC
-0515 C005           PUSH   AR5
-0517 E0             MOVX   A,@DPTR
-0518 FD             MOV    R5,A
-0519 E4             CLR    A
-051A C0E0           PUSH   ACC
-051C C005           PUSH   AR5
-051E E0             MOVX   A,@DPTR
-051F 2400    R      ADD    A,#LOW comfortP0
-0521 F582           MOV    DPL,A
-0523 E4             CLR    A
-0524 3400    R      ADDC   A,#HIGH comfortP0
-0526 F583           MOV    DPH,A
-0528 E0             MOVX   A,@DPTR
-0529 FD             MOV    R5,A
-052A 33             RLC    A
-052B 95E0           SUBB   A,ACC
-052D C0E0           PUSH   ACC
-052F C005           PUSH   AR5
-0531 7B05           MOV    R3,#005H
-0533 7A00    R      MOV    R2,#HIGH(?STR?CFILE?BASE + 026AH)
-0535 7900    R      MOV    R1,#LOW(?STR?CFILE?BASE + 026AH)
-0537 120000  R      LCALL  ?printf
-053A 74FA           MOV    A,#0FAH
-053C 2581           ADD    A,SP
-053E F581           MOV    SP,A
-0540         ?NXT43:
-                                           ; SOURCE LINE # 504 
-0540 E4             CLR    A
-0541 FF             MOV    R7,A
-                                           ; SOURCE LINE # 505 
-0542 22             RET    
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 25
-
-
-            ; FUNCTION _ExecuteCmd (END)
-
-            ; FUNCTION ManageHeatingOutputs (BEGIN)
-                                           ; SOURCE LINE # 510 
-0000 7E00    R      MOV    R6,#HIGH (RtcData) 
-0002 7F00    R      MOV    R7,#LOW (RtcData) 
-0004 120000  R      LCALL  _GetRtc
-                                           ; SOURCE LINE # 512 
-0007 E4             CLR    A
-0008 900000  R      MOV    DPTR,#DO+06H
-000B F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 513 
-000C 900000  R      MOV    DPTR,#DO+05H
-000F F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 514 
-0010 900000  R      MOV    DPTR,#DO+04H
-0013 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 515 
-0014 900000  R      MOV    DPTR,#DO+07H
-0017 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 516 
-0018 900000  R      MOV    DPTR,#openvalves
-001B F0             MOVX   @DPTR,A
-001C A3             INC    DPTR
-001D F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 519 
-001E 900000  R      MOV    DPTR,#DI
-0021 E0             MOVX   A,@DPTR
-0022 6042           JZ     ?NXT74
-                                           ; SOURCE LINE # 522 
-0024 900000  R      MOV    DPTR,#RtcData+04H
-0027 E0             MOVX   A,@DPTR
-0028 FB             MOV    R3,A
-0029 7A00           MOV    R2,#000H
-002B 2400    R      ADD    A,#LOW comfortP1
-002D F8             MOV    R0,A
-002E F582           MOV    DPL,A
-0030 E4             CLR    A
-0031 3400    R      ADDC   A,#HIGH comfortP1
-0033 F583           MOV    DPH,A
-0035 E0             MOVX   A,@DPTR
-0036 24BF           ADD    A,#0BFH
-0038 6011           JZ     ?CASE130
-003A 14             DEC    A
-003B 600E           JZ     ?CASE130
-003D 24FB           ADD    A,#0FBH
-003F 600A           JZ     ?CASE130
-0041 24F9           ADD    A,#0F9H
-0043 6006           JZ     ?CASE130
-0045 24F6           ADD    A,#0F6H
-0047 6018           JZ     ?DEFAULT8
-0049 8016           SJMP   ?DEFAULT8
-004B         ?CASE130:
-                                           ; SOURCE LINE # 528 
-004B 7401           MOV    A,#001H
-004D 900000  R      MOV    DPTR,#DO+06H
-0050 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 529 
-0051 900000  R      MOV    DPTR,#openvalves+01H
-0054 E0             MOVX   A,@DPTR
-0055 04             INC    A
-0056 F0             MOVX   @DPTR,A
-0057 900000  R      MOV    DPTR,#openvalves
-005A 700A           JNZ    ?NXT75
-005C E0             MOVX   A,@DPTR
-005D 04             INC    A
-005E F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 530 
-005F 8005           SJMP   ?NXT74
-0061         ?DEFAULT8:
-                                           ; SOURCE LINE # 534 
-0061 E4             CLR    A
-0062 900000  R      MOV    DPTR,#DO+06H
-0065 F0             MOVX   @DPTR,A
-0066         ?NXT75:
-
-0066         ?NXT74:
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 28
-
-                                           ; SOURCE LINE # 542 
-0066 900000  R      MOV    DPTR,#DI+02H
-0069 E0             MOVX   A,@DPTR
-006A 6042           JZ     ?NXT76
-                                           ; SOURCE LINE # 545 
-006C 900000  R      MOV    DPTR,#RtcData+04H
-006F E0             MOVX   A,@DPTR
-0070 FB             MOV    R3,A
-0071 7A00           MOV    R2,#000H
-0073 2400    R      ADD    A,#LOW comfortP1
-0075 F8             MOV    R0,A
-0076 F582           MOV    DPL,A
-0078 E4             CLR    A
-0079 3400    R      ADDC   A,#HIGH comfortP1
-007B F583           MOV    DPH,A
-007D E0             MOVX   A,@DPTR
-007E 24BF           ADD    A,#0BFH
-0080 6011           JZ     ?CASE137
-0082 14             DEC    A
-0083 6024           JZ     ?DEFAULT9
-0085 24FB           ADD    A,#0FBH
-0087 6020           JZ     ?DEFAULT9
-0089 24F9           ADD    A,#0F9H
-008B 6006           JZ     ?CASE137
-008D 24F6           ADD    A,#0F6H
-008F 6018           JZ     ?DEFAULT9
-0091 8016           SJMP   ?DEFAULT9
-0093         ?CASE137:
-                                           ; SOURCE LINE # 549 
-0093 7401           MOV    A,#001H
-0095 900000  R      MOV    DPTR,#DO+04H
-0098 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 550 
-0099 900000  R      MOV    DPTR,#openvalves+01H
-009C E0             MOVX   A,@DPTR
-009D 04             INC    A
-009E F0             MOVX   @DPTR,A
-009F 900000  R      MOV    DPTR,#openvalves
-00A2 700A           JNZ    ?NXT77
-00A4 E0             MOVX   A,@DPTR
-00A5 04             INC    A
-00A6 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 551 
-00A7 8005           SJMP   ?NXT76
-00A9         ?DEFAULT9:
-                                           ; SOURCE LINE # 556 
-00A9 E4             CLR    A
-00AA 900000  R      MOV    DPTR,#DO+04H
-00AD F0             MOVX   @DPTR,A
-00AE         ?NXT77:
-
-00AE         ?NXT76:
-                                           ; SOURCE LINE # 563 
-00AE 900000  R      MOV    DPTR,#DI+03H
-00B1 E0             MOVX   A,@DPTR
-00B2 6042           JZ     ?NXT78
-                                           ; SOURCE LINE # 566 
-00B4 900000  R      MOV    DPTR,#RtcData+04H
-00B7 E0             MOVX   A,@DPTR
-00B8 FB             MOV    R3,A
-00B9 7A00           MOV    R2,#000H
-00BB 2400    R      ADD    A,#LOW comfortP1
-00BD F8             MOV    R0,A
-00BE F582           MOV    DPL,A
-00C0 E4             CLR    A
-00C1 3400    R      ADDC   A,#HIGH comfortP1
-00C3 F583           MOV    DPH,A
-00C5 E0             MOVX   A,@DPTR
-00C6 24BF           ADD    A,#0BFH
-00C8 6011           JZ     ?CASE141
-00CA 14             DEC    A
-00CB 6024           JZ     ?DEFAULT10
-00CD 24FB           ADD    A,#0FBH
-00CF 600A           JZ     ?CASE141
-00D1 24F9           ADD    A,#0F9H
-00D3 601C           JZ     ?DEFAULT10
-00D5 24F6           ADD    A,#0F6H
-00D7 6018           JZ     ?DEFAULT10
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 29
-
-00D9 8016           SJMP   ?DEFAULT10
-00DB         ?CASE141:
-                                           ; SOURCE LINE # 570 
-00DB 7401           MOV    A,#001H
-00DD 900000  R      MOV    DPTR,#DO+05H
-00E0 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 571 
-00E1 900000  R      MOV    DPTR,#openvalves+01H
-00E4 E0             MOVX   A,@DPTR
-00E5 04             INC    A
-00E6 F0             MOVX   @DPTR,A
-00E7 900000  R      MOV    DPTR,#openvalves
-00EA 700A           JNZ    ?NXT79
-00EC E0             MOVX   A,@DPTR
-00ED 04             INC    A
-00EE F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 572 
-00EF 8005           SJMP   ?NXT78
-00F1         ?DEFAULT10:
-                                           ; SOURCE LINE # 577 
-00F1 E4             CLR    A
-00F2 900000  R      MOV    DPTR,#DO+05H
-00F5 F0             MOVX   @DPTR,A
-00F6         ?NXT79:
-
-00F6         ?NXT78:
-                                           ; SOURCE LINE # 583 
-00F6 900000  R      MOV    DPTR,#DI+01H
-00F9 E0             MOVX   A,@DPTR
-00FA 603E           JZ     ?NXT80
-                                           ; SOURCE LINE # 585 
-00FC 900000  R      MOV    DPTR,#RtcData+04H
-00FF E0             MOVX   A,@DPTR
-0100 FB             MOV    R3,A
-0101 7A00           MOV    R2,#000H
-0103 2400    R      ADD    A,#LOW comfortP0
-0105 F8             MOV    R0,A
-0106 F582           MOV    DPL,A
-0108 E4             CLR    A
-0109 3400    R      ADDC   A,#HIGH comfortP0
-010B F583           MOV    DPH,A
-010D E0             MOVX   A,@DPTR
-010E 24BF           ADD    A,#0BFH
-0110 600D           JZ     ?CASE145
-0112 14             DEC    A
-0113 600A           JZ     ?CASE145
-0115 24FB           ADD    A,#0FBH
-0117 6006           JZ     ?CASE145
-0119 24F9           ADD    A,#0F9H
-011B 6002           JZ     ?CASE145
-011D 8016           SJMP   ?DEFAULT11
-011F         ?CASE145:
-                                           ; SOURCE LINE # 591 
-011F 7401           MOV    A,#001H
-0121 900000  R      MOV    DPTR,#DO+07H
-0124 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 592 
-0125 900000  R      MOV    DPTR,#openvalves+01H
-0128 E0             MOVX   A,@DPTR
-0129 04             INC    A
-012A F0             MOVX   @DPTR,A
-012B 900000  R      MOV    DPTR,#openvalves
-012E 700A           JNZ    ?NXT81
-0130 E0             MOVX   A,@DPTR
-0131 04             INC    A
-0132 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 593 
-0133 8005           SJMP   ?NXT80
-0135         ?DEFAULT11:
-                                           ; SOURCE LINE # 596 
-0135 E4             CLR    A
-0136 900000  R      MOV    DPTR,#DO+07H
-0139 F0             MOVX   @DPTR,A
-013A         ?NXT81:
-
-013A         ?NXT80:
-                                           ; SOURCE LINE # 602 
-013A 900000  R      MOV    DPTR,#DO+06H
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 30
-
-013D E0             MOVX   A,@DPTR
-013E 900000  R      MOV    DPTR,#PLCMemoryLogicOutputs+06H
-0141 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 603 
-0142 900000  R      MOV    DPTR,#DO+05H
-0145 E0             MOVX   A,@DPTR
-0146 900000  R      MOV    DPTR,#PLCMemoryLogicOutputs+05H
-0149 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 604 
-014A 900000  R      MOV    DPTR,#DO+04H
-014D E0             MOVX   A,@DPTR
-014E 900000  R      MOV    DPTR,#PLCMemoryLogicOutputs+04H
-0151 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 605 
-0152 900000  R      MOV    DPTR,#DO+07H
-0155 E0             MOVX   A,@DPTR
-0156 900000  R      MOV    DPTR,#PLCMemoryLogicOutputs+07H
-0159 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 609 
-015A 900000  R      MOV    DPTR,#DI+01H
-015D E0             MOVX   A,@DPTR
-015E 7010           JNZ    ?LAB177
-0160 900000  R      MOV    DPTR,#DI
-0163 E0             MOVX   A,@DPTR
-0164 700A           JNZ    ?LAB177
-0166 900000  R      MOV    DPTR,#DI+02H
-0169 E0             MOVX   A,@DPTR
-016A 7004           JNZ    ?LAB177
-016C A3             INC    DPTR
-016D E0             MOVX   A,@DPTR
-016E 6012           JZ     ?ELSE47
-0170         ?LAB177:
-0170 900000  R      MOV    DPTR,#openvalves
-0173 E0             MOVX   A,@DPTR
-0174 7004           JNZ    ?LAB176
-0176 A3             INC    DPTR
-0177 E0             MOVX   A,@DPTR
-0178 6008           JZ     ?ELSE47
-017A         ?LAB176:
-                                           ; SOURCE LINE # 610 
-017A 7401           MOV    A,#001H
-017C 900000  R      MOV    DPTR,#PLCMemoryLogicOutputs
-017F F0             MOVX   @DPTR,A
-0180 8005           SJMP   ?NXT82
-0182         ?ELSE47:
-                                           ; SOURCE LINE # 612 
-0182 E4             CLR    A
-0183 900000  R      MOV    DPTR,#PLCMemoryLogicOutputs
-0186 F0             MOVX   @DPTR,A
-0187         ?NXT82:
-                                           ; SOURCE LINE # 618 
-0187 900000  R      MOV    DPTR,#openvalves
-018A E0             MOVX   A,@DPTR
-018B 7041           JNZ    ?NXT83
-018D A3             INC    DPTR
-018E E0             MOVX   A,@DPTR
-018F 703D           JNZ    ?NXT83
-                                           ; SOURCE LINE # 620 
-0191 900000  R      MOV    DPTR,#RtcData+04H
-0194 E0             MOVX   A,@DPTR
-0195 FF             MOV    R7,A
-0196 7E00           MOV    R6,#000H
-0198 E4             CLR    A
-0199 FC             MOV    R4,A
-019A 7D03           MOV    R5,#003H
-019C 120000  R      LCALL  ?C_SIDIV
-019F BC002C         CJNE   R4,#000H,?NXT84
-01A2 ED             MOV    A,R5
-01A3 600B           JZ     ?CASE148
-01A5 14             DEC    A
-01A6 6010           JZ     ?CASE149
-01A8 14             DEC    A
-01A9 6015           JZ     ?CASE150
-01AB 14             DEC    A
-01AC 601A           JZ     ?CASE151
-01AE 801E           SJMP   ?NXT83
-01B0         ?CASE148:
-                                           ; SOURCE LINE # 622 
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 31
-
-01B0 7401           MOV    A,#001H
-01B2 900000  R      MOV    DPTR,#PLCMemoryLogicOutputs+06H
-01B5 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 623 
-01B6 8016           SJMP   ?NXT83
-01B8         ?CASE149:
-                                           ; SOURCE LINE # 624 
-01B8 7401           MOV    A,#001H
-01BA 900000  R      MOV    DPTR,#PLCMemoryLogicOutputs+07H
-01BD F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 625 
-01BE 800E           SJMP   ?NXT83
-01C0         ?CASE150:
-                                           ; SOURCE LINE # 626 
-01C0 7401           MOV    A,#001H
-01C2 900000  R      MOV    DPTR,#PLCMemoryLogicOutputs+05H
-01C5 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 627 
-01C6 8006           SJMP   ?NXT83
-01C8         ?CASE151:
-                                           ; SOURCE LINE # 628 
-01C8 7401           MOV    A,#001H
-01CA 900000  R      MOV    DPTR,#PLCMemoryLogicOutputs+04H
-01CD F0             MOVX   @DPTR,A
-01CE         ?NXT84:
-
-01CE         ?NXT83:
-                                           ; SOURCE LINE # 636 
-01CE 900000  R      MOV    DPTR,#RtcONTime+02H
-01D1 E0             MOVX   A,@DPTR
-01D2 F5F0           MOV    B,A
-01D4 900000  R      MOV    DPTR,#RtcData+02H
-01D7 E0             MOVX   A,@DPTR
-01D8 B5F001         CJNE   A,B,?LAB183
-01DB D3             SETB   C
-01DC         ?LAB183:
-01DC 406F           JC     ?NXT85
-                                           ; SOURCE LINE # 640 
-01DE 900000  R      MOV    DPTR,#TotMinutiON
-01E1 E0             MOVX   A,@DPTR
-01E2 C0E0           PUSH   ACC
-01E4 A3             INC    DPTR
-01E5 E0             MOVX   A,@DPTR
-01E6 C0E0           PUSH   ACC
-01E8 900000  R      MOV    DPTR,#RtcONTime+04H
-01EB E0             MOVX   A,@DPTR
-01EC FF             MOV    R7,A
-01ED 7E00           MOV    R6,#000H
-01EF E4             CLR    A
-01F0 FC             MOV    R4,A
-01F1 7D3C           MOV    R5,#03CH
-01F3 120000  R      LCALL  ?C_IMUL
-01F6 A3             INC    DPTR
-01F7 E0             MOVX   A,@DPTR
-01F8 FB             MOV    R3,A
-01F9 EF             MOV    A,R7
-01FA 2B             ADD    A,R3
-01FB FB             MOV    R3,A
-01FC E4             CLR    A
-01FD 3E             ADDC   A,R6
-01FE FA             MOV    R2,A
-01FF 74DC           MOV    A,#0DCH
-0201 C3             CLR    C
-0202 9B             SUBB   A,R3
-0203 FB             MOV    R3,A
-0204 7405           MOV    A,#005H
-0206 9A             SUBB   A,R2
-0207 FA             MOV    R2,A
-0208 D0E0           POP    ACC
-020A 2B             ADD    A,R3
-020B FB             MOV    R3,A
-020C D0E0           POP    ACC
-020E 3A             ADDC   A,R2
-020F FA             MOV    R2,A
-0210 900000  R      MOV    DPTR,#TotMinutiON
-0213 F0             MOVX   @DPTR,A
-0214 A3             INC    DPTR
-0215 EB             MOV    A,R3
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 32
-
-0216 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 642 
-0217 900000  R      MOV    DPTR,#RtcONTime+02H
-021A E0             MOVX   A,@DPTR
-021B 25E0           ADD    A,ACC
-021D FD             MOV    R5,A
-021E 900000  R      MOV    DPTR,#RtcONTime+01H
-0221 E0             MOVX   A,@DPTR
-0222 75F03E         MOV    B,#03EH
-0225 A4             MUL    AB
-0226 2400    R      ADD    A,#LOW (StatMinutiON + 0C0H)
-0228 F582           MOV    DPL,A
-022A E5F0           MOV    A,B
-022C 3400    R      ADDC   A,#HIGH (StatMinutiON + 0C0H)
-022E F583           MOV    DPH,A
-0230 ED             MOV    A,R5
-0231 2582           ADD    A,DPL
-0233 F582           MOV    DPL,A
-0235 E4             CLR    A
-0236 3583           ADDC   A,DPH
-0238 F583           MOV    DPH,A
-023A EA             MOV    A,R2
-023B F0             MOVX   @DPTR,A
-023C A3             INC    DPTR
-023D EB             MOV    A,R3
-023E F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 643 
-023F 900000  R      MOV    DPTR,#TotMinutiON
-0242 E4             CLR    A
-0243 F0             MOVX   @DPTR,A
-0244 A3             INC    DPTR
-0245 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 644 
-0246 7F00    R      MOV    R7,#LOW (RtcONTime) 
-0248 7E00    R      MOV    R6,#HIGH (RtcONTime) 
-024A 120000  R      LCALL  _GetRtc
-024D         ?NXT85:
-                                           ; SOURCE LINE # 649 
-024D 900000  R      MOV    DPTR,#openvalves
-0250 E0             MOVX   A,@DPTR
-0251 7004           JNZ    ?LAB186
-0253 A3             INC    DPTR
-0254 E0             MOVX   A,@DPTR
-0255 601A           JZ     ?ELSE50
-0257         ?LAB186:
-0257 900000  R      MOV    DPTR,#PreviousStatus
-025A E0             MOVX   A,@DPTR
-025B 7014           JNZ    ?ELSE50
-025D A3             INC    DPTR
-025E E0             MOVX   A,@DPTR
-025F 7010           JNZ    ?ELSE50
-                                           ; SOURCE LINE # 651 
-0261 7E00    R      MOV    R6,#HIGH (RtcONTime) 
-0263 7F00    R      MOV    R7,#LOW (RtcONTime) 
-0265 120000  R      LCALL  _GetRtc
-                                           ; SOURCE LINE # 652 
-0268 900000  R      MOV    DPTR,#PreviousStatus
-026B E4             CLR    A
-026C F0             MOVX   @DPTR,A
-026D A3             INC    DPTR
-026E 04             INC    A
-026F F0             MOVX   @DPTR,A
-0270 22             RET    
-0271         ?ELSE50:
-                                           ; SOURCE LINE # 659 
-0271 900000  R      MOV    DPTR,#openvalves
-0274 E0             MOVX   A,@DPTR
-0275 7062           JNZ    ?NXT86
-0277 A3             INC    DPTR
-0278 E0             MOVX   A,@DPTR
-0279 705E           JNZ    ?NXT86
-027B 900000  R      MOV    DPTR,#PreviousStatus
-027E E0             MOVX   A,@DPTR
-027F 7004           JNZ    ?LAB188
-0281 A3             INC    DPTR
-0282 E0             MOVX   A,@DPTR
-0283 6054           JZ     ?NXT86
-0285         ?LAB188:
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 33
-
-                                           ; SOURCE LINE # 665 
-0285 900000  R      MOV    DPTR,#TotMinutiON
-0288 E0             MOVX   A,@DPTR
-0289 C0E0           PUSH   ACC
-028B A3             INC    DPTR
-028C E0             MOVX   A,@DPTR
-028D C0E0           PUSH   ACC
-028F 900000  R      MOV    DPTR,#RtcData+04H
-0292 E0             MOVX   A,@DPTR
-0293 FF             MOV    R7,A
-0294 7E00           MOV    R6,#000H
-0296 E4             CLR    A
-0297 FC             MOV    R4,A
-0298 7D3C           MOV    R5,#03CH
-029A 120000  R      LCALL  ?C_IMUL
-029D A3             INC    DPTR
-029E E0             MOVX   A,@DPTR
-029F FB             MOV    R3,A
-02A0 EF             MOV    A,R7
-02A1 2B             ADD    A,R3
-02A2 FB             MOV    R3,A
-02A3 E4             CLR    A
-02A4 3E             ADDC   A,R6
-02A5 FA             MOV    R2,A
-02A6 900000  R      MOV    DPTR,#RtcONTime+04H
-02A9 E0             MOVX   A,@DPTR
-02AA FF             MOV    R7,A
-02AB 7E00           MOV    R6,#000H
-02AD E4             CLR    A
-02AE FC             MOV    R4,A
-02AF 7D3C           MOV    R5,#03CH
-02B1 120000  R      LCALL  ?C_IMUL
-02B4 A3             INC    DPTR
-02B5 E0             MOVX   A,@DPTR
-02B6 FD             MOV    R5,A
-02B7 EF             MOV    A,R7
-02B8 2D             ADD    A,R5
-02B9 FD             MOV    R5,A
-02BA E4             CLR    A
-02BB 3E             ADDC   A,R6
-02BC FC             MOV    R4,A
-02BD EB             MOV    A,R3
-02BE C3             CLR    C
-02BF 9D             SUBB   A,R5
-02C0 FD             MOV    R5,A
-02C1 EA             MOV    A,R2
-02C2 9C             SUBB   A,R4
-02C3 FC             MOV    R4,A
-02C4 D0E0           POP    ACC
-02C6 2D             ADD    A,R5
-02C7 FD             MOV    R5,A
-02C8 D0E0           POP    ACC
-02CA 3C             ADDC   A,R4
-02CB 900000  R      MOV    DPTR,#TotMinutiON
-02CE F0             MOVX   @DPTR,A
-02CF A3             INC    DPTR
-02D0 ED             MOV    A,R5
-02D1 F0             MOVX   @DPTR,A
-                                           ; SOURCE LINE # 669 
-02D2 900000  R      MOV    DPTR,#PreviousStatus
-02D5 E4             CLR    A
-02D6 F0             MOVX   @DPTR,A
-02D7 A3             INC    DPTR
-02D8 F0             MOVX   @DPTR,A
-02D9         ?NXT86:
-                                           ; SOURCE LINE # 673 
-02D9 22             RET    
-
-            ; FUNCTION ManageHeatingOutputs (END)
-
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 35
+RC51 COMPILER V03.03.37,  CFILE                  03/17/11  19:16:42  PAGE 12
 
 NAME                                    CLASS   MSPACE  TYPE    OFFSET  SIZE
 ====                                    =====   ======  ====    ======  ====
@@ -2716,51 +769,40 @@ PreviousStatus . . . . . . . . . . . .  PUBLIC  XDATA   U_INT  003CH   2
 TotMinutiON. . . . . . . . . . . . . .  PUBLIC  XDATA   U_INT  003EH   2    
 TotOreON . . . . . . . . . . . . . . .  PUBLIC  XDATA   U_INT  0040H   2    
 StatMinutiON . . . . . . . . . . . . .  PUBLIC  XDATA   ARRAY   0042H   744  
-comfortP0. . . . . . . . . . . . . . .  PUBLIC  XDATA   ARRAY   032AH   24   
-comfortP1. . . . . . . . . . . . . . .  PUBLIC  XDATA   ARRAY   0342H   24   
-CustomFunction . . . . . . . . . . . .  PUBLIC  CODE    PROC    -----   -----
-SerialStruct?450 . . . . . . . . . . .  AUTO    XDATA   STRUCT  0000H   7    
-i?451. . . . . . . . . . . . . . . . .  AUTO    XDATA   INT     0007H   2    
-j?452. . . . . . . . . . . . . . . . .  AUTO    XDATA   INT     0009H   2    
-ParseCOM . . . . . . . . . . . . . . .  PUBLIC  CODE    PROC    -----   -----
-cmd?456. . . . . . . . . . . . . . . .  STATIC  XDATA   U_CHAR  035AH   1    
-op_len?457 . . . . . . . . . . . . . .  STATIC  XDATA   U_CHAR  035BH   1    
-op_cnt?458 . . . . . . . . . . . . . .  STATIC  XDATA   U_CHAR  035CH   1    
-parm1?459. . . . . . . . . . . . . . .  STATIC  XDATA   U_CHAR  035DH   1    
-c?460. . . . . . . . . . . . . . . . .  AUTO    XDATA   CHAR    0000H   1    
-ExecuteCmd . . . . . . . . . . . . . .  PUBLIC  CODE    PROC    -----   -----
-  cmd?461. . . . . . . . . . . . . . .  PARAM   XDATA   U_CHAR  0000H   1    
-  parm1?462. . . . . . . . . . . . . .  PARAM   XDATA   U_CHAR  0001H   1    
-  cmd?461. . . . . . . . . . . . . . .  PARAM   XDATA   U_CHAR  0000H   1    
-  parm1?462. . . . . . . . . . . . . .  PARAM   XDATA   U_CHAR  0001H   1    
-i?463. . . . . . . . . . . . . . . . .  AUTO    XDATA   CHAR    0002H   1    
-ManageHeatingOutputs . . . . . . . . .  PUBLIC  CODE    PROC    -----   -----
+chptr. . . . . . . . . . . . . . . . .  STATIC  XDATA   CHAR    032AH   1    
+argcnt . . . . . . . . . . . . . . . .  STATIC  XDATA   CHAR    032BH   1    
+argvect. . . . . . . . . . . . . . . .  STATIC  XDATA   ARRAY   032CH   6    
+cmdline. . . . . . . . . . . . . . . .  STATIC  XDATA   ARRAY   0332H   32   
+cmd_descr. . . . . . . . . . . . . . .  * TAG * -----   STRUCT  -----   11   
+  cmd. . . . . . . . . . . . . . . . .  MEMBER  -----   ARRAY   0000H   10   
+  argnum . . . . . . . . . . . . . . .  MEMBER  -----   CHAR    000AH   1    
+commandlist. . . . . . . . . . . . . .  PUBLIC  XDATA   ARRAY   0352H   77   
+defaultZonaNotte . . . . . . . . . . .  PUBLIC  XDATA   U_LONG  039FH   4    
+defaultZonaGiorno. . . . . . . . . . .  PUBLIC  XDATA   U_LONG  03A3H   4    
+defaultZonaBagni . . . . . . . . . . .  PUBLIC  XDATA   U_LONG  03A7H   4    
+defaultP0ZonaUnica . . . . . . . . . .  PUBLIC  XDATA   U_LONG  03ABH   4    
+comfortP0. . . . . . . . . . . . . . .  PUBLIC  XDATA   ARRAY   03AFH   24   
+comfortP1. . . . . . . . . . . . . . .  PUBLIC  XDATA   ARRAY   03C7H   24   
 PLCFirstLoop . . . . . . . . . . . . .  EXTERN  XDATA   U_CHAR  -----   -----
 IOSerialPortA. . . . . . . . . . . . .  EXTERN  XDATA   PTR     -----   -----
 PLCMemoryLogicInputs . . . . . . . . .  EXTERN  XDATA   ARRAY   -----   -----
+ZonaNotte. . . . . . . . . . . . . . .  EXTERN  XDATA   U_LONG  -----   -----
+ZonaBagni. . . . . . . . . . . . . . .  EXTERN  XDATA   U_LONG  -----   -----
+P0ZonaUnica. . . . . . . . . . . . . .  EXTERN  XDATA   U_LONG  -----   -----
 PLCPulse1000 . . . . . . . . . . . . .  EXTERN  XDATA   U_CHAR  -----   -----
-SetTermIOVectors . . . . . . . . . . .  EXTERN  CODE    PROC    -----   -----
-GetSerialMode. . . . . . . . . . . . .  EXTERN  CODE    PROC    -----   -----
-SetSerialMode. . . . . . . . . . . . .  EXTERN  CODE    PROC    -----   -----
-GetRtc . . . . . . . . . . . . . . . .  EXTERN  CODE    PROC    -----   -----
-TermIOTick . . . . . . . . . . . . . .  EXTERN  CODE    PROC    -----   -----
-GetRxChars . . . . . . . . . . . . . .  EXTERN  CODE    PROC    -----   -----
-GetCh. . . . . . . . . . . . . . . . .  EXTERN  CODE    PROC    -----   -----
 PLCMemoryLogicOutputs. . . . . . . . .  EXTERN  XDATA   ARRAY   -----   -----
-SetRtc . . . . . . . . . . . . . . . .  EXTERN  CODE    PROC    -----   -----
-printf . . . . . . . . . . . . . . . .  EXTERN  CODE    PROC    -----   -----
-RC51 COMPILER V03.03.37,  CFILE                  02/26/11  15:33:42  PAGE 36
+RC51 COMPILER V03.03.37,  CFILE                  03/17/11  19:16:42  PAGE 13
 
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =   2843    ----
-   CONSTANT SIZE    =    666    ----
-   XDATA SIZE       =    862      13
+   CODE SIZE        =   ----    ----
+   CONSTANT SIZE    =    679    ----
+   XDATA SIZE       =    991    ----
    PDATA SIZE       =   ----    ----
    DATA SIZE        =   ----    ----
    IDATA SIZE       =   ----    ----
    BIT SIZE         =   ----    ----
 END OF MODULE INFORMATION.
 
-RC51 COMPILATION COMPLETE.  0 WARNING,  0 ERROR
+RC51 COMPILATION COMPLETE.  0 WARNING, 10 ERRORS

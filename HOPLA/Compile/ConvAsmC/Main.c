@@ -14,19 +14,19 @@ extern unsigned char PLCMemoryFlags[];
 
 static BACKUPFUNSTRUCT PLCUserBackupInfo={
     (void*)0x0580, //Source data address
-    16, //Number of double words to backup
+    23, //Number of double words to backup
     0, //Backup Memory Type
     0x00005200L, //Backup memory address
 };
 
 code PLCREMOTERPROJECTINFO PLCRemoterProjectInfo = {
-                         26,
-                         2,
+                         17,
+                         3,
                          11,
-                         15,
-                         33,
-                         40,
-                         29,
+                         19,
+                         16,
+                         37,
+                         60,
                          8,
                          2,
                          2,

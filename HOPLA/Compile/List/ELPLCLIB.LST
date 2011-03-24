@@ -1,4 +1,4 @@
-MACRO ASSEMBLER ELPLCLIB                                                                                       02/26/11 15:33:41 PAGE     1
+MACRO ASSEMBLER ELPLCLIB                                                                                       03/06/11 19:42:23 PAGE     1
 
 
 DOS MACRO ASSEMBLER MA51 V06.04.17OBJECT MODULE PLACED IN C:\DOCUMENTS AND SETTINGS\IB\MY DOCUMENTS\REMOTERAPPLICATIONS\HOPLA\COMPILE\ELPLCLIB.OBJ
@@ -75,7 +75,7 @@ LOC     OBJ           LINE    SOURCE
                        416     
                        417     ; Line    21 EXTR F PLCTxBufEmpty
                        418     
-MACRO ASSEMBLER ELPLCLIB                                                                             02/26/11  15:33:41 PAGE     2
+MACRO ASSEMBLER ELPLCLIB                                                                             03/06/11  19:42:23 PAGE     2
                      
                        419     ; Line    22 EXTR F PLCChrReceived
                        420     
@@ -154,7 +154,7 @@ LOC     OBJ           LINE    SOURCE
                        493     ; Line    64 DEFG Y PLCRtcHour Y PLCRtcData KD 4
                        494     
                        495     ; Line    65 DEFG Y PLCRtcMinute Y PLCRtcData KD 5
-MACRO ASSEMBLER ELPLCLIB                                                                             02/26/11  15:33:41 PAGE     3
+MACRO ASSEMBLER ELPLCLIB                                                                             03/06/11  19:42:23 PAGE     3
                      
                        496     
                        497     ; Line    66 DEFG Y PLCRtcSecond Y PLCRtcData KD 6
@@ -163,7 +163,7 @@ LOC     OBJ           LINE    SOURCE
 0000    22             500         ret
                        501     
                        502         END
-MACRO ASSEMBLER ELPLCLIB                                                                                       02/26/11 15:33:41 PAGE     0
+MACRO ASSEMBLER ELPLCLIB                                                                                       03/06/11 19:42:23 PAGE     0
 
 
 SYMBOL TABLE LISTING
@@ -251,7 +251,7 @@ exf2 . . . . . . .  B ADDR   00C8H.6 A                          131#
 pt1. . . . . . . .  B ADDR   00B8H.3 A                          120# 
 ad0. . . . . . . .  B ADDR   0080H.0 A                          34# 
 f0 . . . . . . . .  B ADDR   00D0H.5 A                          145# 
-MACRO ASSEMBLER ELPLCLIB                                                                                       02/26/11 15:33:41 PAGE     1
+MACRO ASSEMBLER ELPLCLIB                                                                                       03/06/11 19:42:23 PAGE     1
 
 
 DOS MACRO ASSEMBLER MA51 V06.04.17OBJECT MODULE PLACED IN C:\DOCUMENTS AND SETTINGS\IB\MY DOCUMENTS\REMOTERAPPLICATIONS\HOPLA\COMPILE\ELPLCLIB.OBJ

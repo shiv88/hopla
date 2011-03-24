@@ -9,7 +9,7 @@ INTER-MODULE CROSS-REFERENCE LISTING
           ?C_CBADDMUL . . . . CODE    [_C_CBAM]:  CFILE
           ?C_CPY  . . . . . . CODE    [STRCPY]: 
           ?C_DECDPTR  . . . . CODE    [_C_DECDP]:  BACKUP
-          ?C_DPTR2DPTR  . . . CODE    [_C_DP2DP]:  SETTERMIOVECTORS, BACKUP
+          ?C_DPTR2DPTR  . . . CODE    [_C_DP2DP]:  SETTERMIOVECTORS, BACKUP, CFILE
           ?C_IMUL . . . . . . CODE    [MULS]:  CFILE
           ?C_IMULX  . . . . . CODE    [MULS]: 
           ?C_INDCALL  . . . . CODE    [_C_INDCL]:  TERMIOTICK, SETTERMIOVECTORS, SETSERIALMODE, GETSERIALMODE, GETRXCHARS, GETCH
@@ -20,14 +20,18 @@ INTER-MODULE CROSS-REFERENCE LISTING
           ?C_SIDIV  . . . . . CODE    [DIVS]:  CFILE
           ?C_START0 . . . . . CODE    [STARTUP]:  MAIN
           ?C_UIDIV  . . . . . CODE    [DIVS]: 
+          ?isdigit  . . . . . CODE    [ISDIG]:  CFILE
+          ?isspace  . . . . . CODE    [ISSPACE]:  CFILE
           ?memcmp . . . . . . CODE    [MEMCMP]:  RTCLOCK
           ?memcpy . . . . . . CODE    [MEMCPY]:  RTCLOCK
-          ?printf1  . . . . . CODE    [PRINT1]:  CFILE
+          ?printf3  . . . . . CODE    [PRINT3]:  CFILE
           ?SfrPLC_InputAcq  . CODE    [INPUTACQ]:  MAIN
           ?SfrPLC_OutputMng . CODE    [OUTPUTMNG]:  MAIN
-          ?sprintf1 . . . . . CODE    [PRINT1]: 
+          ?sprintf3 . . . . . CODE    [PRINT3]: 
           ?strcmp . . . . . . CODE    [STRCMP]: 
           ?strcpy . . . . . . CODE    [STRCPY]:  SYSTEM
+          ?strlen . . . . . . CODE    [STRLEN]:  CFILE
+          ?strstr . . . . . . CODE    [STRSTR]:  CFILE
           ?_ArrayBitSet?BYTE  XDATA   [KERNELVARS]: 
           ?_Linearize?BYTE  . XDATA   [KERNELVARS]: 
           ?_NSYSTExtReadVar?BYXDATA   [KERNELVARS]: 
@@ -39,9 +43,14 @@ INTER-MODULE CROSS-REFERENCE LISTING
           BankSwitch  . . . . CODE    [KERNELFCTS]:  BANKSWITCH
           comfortP0 . . . . . XDATA   [CFILE]: 
           comfortP1 . . . . . XDATA   [CFILE]: 
+          commandlist . . . . XDATA   [CFILE]: 
           CPL_R4R5  . . . . . CODE    [DIVS]: 
           CPL_R6R7  . . . . . CODE    [DIVS]: 
           CustomFunction  . . CODE    [CFILE]:  RILFILE
+          defaultP0ZonaUnica  XDATA   [CFILE]: 
+          defaultZonaBagni  . XDATA   [CFILE]: 
+          defaultZonaGiorno . XDATA   [CFILE]: 
+          defaultZonaNotte  . XDATA   [CFILE]: 
           DeviceIsOpen?TERMIO?CODE    [TERMIO]:  TERMIO
           DI  . . . . . . . . XDATA   [CFILE]: 
           DIV_2 . . . . . . . CODE    [DIVS]: 
@@ -63,8 +72,9 @@ INTER-MODULE CROSS-REFERENCE LISTING
           IODeviceFctReturn . CODE    [TERMIO]:  SERIALFCTS0
           IODeviceNotCorrect  XDATA   [TERMIO]:  SETTERMIOVECTORS
           IOSerialPortA . . . XDATA   [SERIALFCTS0]:  CFILE
-          IPGN0?C . . . . . . CODE    [IPGN0]:  IPGN0_INC
-          IPGN0INC?C  . . . . CODE    [IPGN0_INC]:  PRINT1
+          IPGN0?C . . . . . . CODE    [IPGN0]:  IPGN0_INC, STRSTR
+          IPGN0INC?C  . . . . CODE    [IPGN0_INC]:  PRINT3
+          IPGN1?C . . . . . . CODE    [IPGN1]:  STRSTR
           KernelErrors  . . . XDATA   [KERNELVARS]: 
           KernelGoProgram . . CODE    [KERNELFCTS]: 
           KernelVersion . . . XDATA   [KERNELVARS]: 
@@ -91,9 +101,9 @@ INTER-MODULE CROSS-REFERENCE LISTING
           NSYSTExtModuleNumberCODE    [KERNELFCTS]: 
           NSYSTReadyIn  . . . CODE    [KERNELFCTS]: 
           openvalves  . . . . XDATA   [CFILE]: 
-          ParseCOM  . . . . . CODE    [CFILE]:  CFILE
           PLCBackupDataArea . XDATA   [PLCRILDECLARATION]: 
           PLCBackupDisable  . XDATA   [COMMONC]:  BACKUP
+          PLCBackupDummy0 . . XDATA   [PLCRILDECLARATION]: 
           PLCBackupEnd  . . . XDATA   [COMMONC]:  BACKUP
           PLCBackupHeader . . XDATA   [PLCRILDECLARATION]: 
           PLCBackupOneShot  . XDATA   [COMMONC]:  BACKUP
@@ -138,6 +148,10 @@ INTER-MODULE CROSS-REFERENCE LISTING
           PLCTimeBase800  . . XDATA   [COMMONC]: 
           PLCTxBufEmpty . . . XDATA   [COMMONC]: 
           PLCTxBufFull  . . . XDATA   [COMMONC]: 
+          PLC_DW_P0ZonaUnica  XDATA   [PLCRILDECLARATION]: 
+          PLC_DW_P1ZonaBagni  XDATA   [PLCRILDECLARATION]: 
+          PLC_DW_P1ZonaGiorno XDATA   [PLCRILDECLARATION]: 
+          PLC_DW_P1ZonaNotte  XDATA   [PLCRILDECLARATION]: 
           PLC_F_1 . . . . . . NUMBER  [RILFILE]: 
           PLC_I_0 . . . . . . NUMBER  [RILFILE]: 
           PLC_I_1 . . . . . . NUMBER  [RILFILE]: 
@@ -200,9 +214,9 @@ INTER-MODULE CROSS-REFERENCE LISTING
           WDogRefresh . . . . CODE    [KERNELFCTS]:  COMMONC, BACKUP
           XD2XD4?C  . . . . . CODE    [XD2XD4]:  BACKUP
           XPGN0?C . . . . . . CODE    [XPGN0]:  XPGN0_INC
-          XPGN0INC?C  . . . . CODE    [XPGN0_INC]:  PRINT1
+          XPGN0INC?C  . . . . CODE    [XPGN0_INC]:  PRINT3
           XPGN1?C . . . . . . CODE    [XPGN1]:  XPGN1_INC
-          XPGN1INC?C  . . . . CODE    [XPGN1_INC]:  PRINT1
+          XPGN1INC?C  . . . . CODE    [XPGN1_INC]:  PRINT3
           _ArrayBitCount  . . CODE    [KERNELFCTS]: 
           _ArrayBitSet  . . . CODE    [KERNELFCTS]: 
           _ArrayBitStatus . . CODE    [KERNELFCTS]: 
@@ -239,10 +253,11 @@ INTER-MODULE CROSS-REFERENCE LISTING
           _NSYSTExtReadVar  . CODE    [KERNELFCTS]: 
           _NSYSTExtWriteVar . CODE    [KERNELFCTS]: 
           _NSYSTReadyMng  . . CODE    [KERNELFCTS]: 
+          _ParseCOM2  . . . . CODE    [CFILE]:  CFILE
           _PeripheralInp  . . CODE    [KERNELFCTS]:  INPUTACQ
           _PeripheralOut  . . CODE    [KERNELFCTS]:  OUTPUTMNG
           _PSYSTReadyMng  . . CODE    [KERNELFCTS]: 
-          _putchar  . . . . . CODE    [PUTCHAR]:  PRINT1, STARTUP
+          _putchar  . . . . . CODE    [PUTCHAR]:  PRINT3, STARTUP
           _RunLEDMng  . . . . CODE    [KERNELFCTS]: 
           _SetClockIntTime  . CODE    [KERNELFCTS]: 
           _SetClockIntVector  CODE    [KERNELFCTS]: 
@@ -263,6 +278,7 @@ INTER-MODULE CROSS-REFERENCE LISTING
           _STACK  . . . . . . IDATA   [ELPLCLIB]:  STARTUP
           _SystemMemoryRead . CODE    [KERNELFCTS]:  BACKUP
           _SystemMemoryWrite  CODE    [KERNELFCTS]:  BACKUP
+          __flag1 . . . . . . CODE    [CTYPE1]:  CFILE
           __LOCAL_END__ . . . CODE    [SHARING]:  STRCPY
           __NULL_POINTER__  . CODE    [SHARING]:  STRCPY
           __PGN0_INC__  . . . CODE    [PGN0_INC]:  IPGN0_INC, XPGN0_INC

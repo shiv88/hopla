@@ -31,6 +31,9 @@
 |              |       | Ottimizzazione dimensione codice oggetto     |        |
 |  27/2/11 wip | 0.7.1 | Aggiunta statistiche giornaliere per un anno |   IB   |
 |              |       | Risolto b3                                   |        |
+|  6/3/11 run  | 0.7.2 | Nuovo parser                                 |   IB   |
+|  16/3/11 wip | 0.8.0 | Retain configuration vector                  |   IB   |
+|              |       |                                   |        |
 +--------------+-------+----------------------------------------------+-------*/
 
 //buglist
@@ -40,50 +43,45 @@
 // 0.7.0: b4 manca possibilita' di settare il giorno del rtc
 
 // -----------------------------------------------------------------------------
-// FILE INCLUSIONS
+// FILE INCLUSIONS ANSI-C ed ELSIST
 // -----------------------------------------------------------------------------
 #include <stdio.h>
+#include <string.h>
+#include <ctype.h>
 #include <ElSystemLib.h>
 #include <ElPLCLib.h>
 
+// -----------------------------------------------------------------------------
+// Le define corrispondono alle connessioni su morsettiere
+// -----------------------------------------------------------------------------
 #define TERMOSTATOP1CORR 0
 #define TERMOSTATOP0 1
 #define TERMOSTATOP1PAOLO 2
 #define TERMOSTATOP1GIORNO 3
-
 #define HEATER_ON 0
 #define ZONA1N 4
 #define ZONA1G 5
 #define ZONA1B 6
 #define ZONAP0 7
 
-/** Logic boolean value  */
-/* False is 0, not zero is true                      */
-//typedef char Logic;
-
-#ifndef TRUE
-  #define TRUE 1
-#endif
-
-#ifndef FALSE
-  #define FALSE 0
-#endif
-
-#define MAXDI 16
-#define MAXDO 8
 
 // -----------------------------------------------------------------------------
-// debug mode and variable declarations
+// debug. Togliere i commenti dalle define per attivare i debug su COM 
 // -----------------------------------------------------------------------------
 //#define DBG_LEVEL
 #ifdef DBG_LEVEL
     char dbg1;
     char dbg2;
 #endif
+//#define DBG_PARSECOM
 
 // -----------------------------------------------------------------------------
 // global variable declarations
 // -----------------------------------------------------------------------------
+
+// Max in/out del modulo
+#define MAXDI 16
+#define MAXDO 8
 
 BOOL DI[MAXDI]={
 0, // TERMOSTATOP1CORR 0
@@ -103,7 +101,6 @@ BOOL DO[MAXDO]={
 
 static int nextaction=0;
 int openvalves=0;
-//int antiicing;
 RTCDATA RtcData; //Rtc data structure
 
 // @Section("Custom Function - 0.7.0")  Misura tempo di accensione
@@ -111,6 +108,32 @@ RTCDATA RtcPLCSTARTTime,RtcONTime, RtcTimeNow; //Rtc data structure
 unsigned int PreviousStatus, TotMinutiON, TotOreON;
 // @Section("Custom Function - 0.7.1")  statistiche
 unsigned int StatMinutiON[12][31];
+
+// @Section("Custom Function - 0.7.2")  nuovo parsecom
+// -----------------------------------------------------------------------------
+// PARSECOM PROTOTYPE
+// -----------------------------------------------------------------------------
+char ParseCOM2(char *argcnt, char *argvect);
+#define CMDLINEMAXLEN 32
+// -----------------------------------------------------------------------------
+// PARSECOM EXTERN VARIABLES
+// -----------------------------------------------------------------------------
+static char chptr=0;
+static char argcnt;
+static char argvect[6];
+static char cmdline[32];
+struct cmd_descr {
+    char cmd[10];
+    char argnum;
+} commandlist[]= { {"nop", 0 }, {"status", 0}, {"timeset", 2}, {"timeread",0},
+    {"dataset", 3},{"dataread",0} , {"reset",0} };
+#define NUMCOMANDI 7
+
+// @Section("8.0.0 - Retain confort vector")
+extern unsigned long ZonaNotte;
+extern unsigned long ZonaGiorno;
+extern unsigned long ZonaBagni;
+extern unsigned long P0ZonaUnica;
 
 // -----------------------------------------------------------------------------
 // HEATING ZONES CONFIGURATION
@@ -122,13 +145,74 @@ unsigned int StatMinutiON[12][31];
 // N= zona notte + corridoi + bagni
 // G= zona giorno + corridoi + bagni
 // A= All ON
+//                                          22221111111111
+//                                          321098765432109876543210          
+unsigned long defaultZonaNotte=   0b00000000111100000110000010000000;
+unsigned long defaultZonaGiorno=  0b00000000011111111111111110000000;
+unsigned long defaultZonaBagni=   0b00000000011111111111111111000000;
+unsigned long defaultP0ZonaUnica= 0b00000000111111111111111111111111;
+
+
+// B= -> 0001
+// X= all off
+// N= -> 0010
+// G= -> 0100
+// A= All ON
+//P0= -> 1000
+void comfort2backup(void)
+{
+unsigned long temp;
+temp=0;
+
+for i(=0;i<24;i++)
+{
+    temp << 4;
+    switch (comfortP1[i])
+    {
+        case 'B':
+            temp += 0b0001;
+            break;
+        case 'N':
+            temp += 0b0010;
+            break;
+        case 'G':
+            temp += 0b0100;
+            break;
+        case 'A':
+            temp += 0b0111;    
+    }
+    if (comfortP0[i] == 'A')
+        tmp +=0b1000;
+
+    if (i==7)
+    {
+        comfortbackup1=temp
+        temp=0;
+    }
+    if (i==15)
+    {
+        comfortbackup2=temp
+        temp=0;
+    }
+    if (i==23)
+    {
+        comfortbackup3=temp
+        temp=0;
+    }
+}
+backup2comfort
+
+
+da fare:
+1- comando per caricare default nei vettori confort
+2- cambiare la logica di accensione output utilizzando i vettori retain
+3- cambiare i comandi di modifica della programm comfort
 
 char comfortP0[24]={
 'A','A','A','A','A','A',
 'A','A','A','A','A','A',
 'A','A','A','A','A','A',
 'A','A','A','A','A','A' }; 
- 
 char comfortP1[24]={
 'X', // dalle 00:00 alle 00:59 -> tutto spento
 'X','X','X','X','X',// dalle 1:00 alle 5:59 -> tutto spento 
@@ -144,7 +228,7 @@ char comfortP1[24]={
 // function prototipes
 //void   ManageHeatingInputs(void);
 void   ManageHeatingOutputs(void);         
-void ParseCOM(void);
+
 char ExecuteCmd(unsigned char , unsigned char );
 // -----------------------------------------------------------------------------
 // CUSTOM FUNCTION
@@ -200,8 +284,36 @@ int i,j;
 	DI[TERMOSTATOP1GIORNO] = PLCOpI(TERMOSTATOP1GIORNO);
      	
     // input/outpout via seriale
-    ParseCOM();
+    if ((i=ParseCOM2(&argcnt, argvect))>0)
+    {
+#ifdef DBG_PARSECOM
+        printf ("funziona:%d\n",i);
+#endif
+        if (i==1)
+            ExecuteCmd('S', 0);
+        if (i==3)
+            ExecuteCmd('T', 0);
 
+        if (i==2)
+        {
+            ExecuteCmd('H', argvect[0]);
+            ExecuteCmd('m', argvect[1]);
+        }
+
+        if (i==4)
+        {
+            ExecuteCmd('d', argvect[0]);
+            ExecuteCmd('M', argvect[1]);
+            ExecuteCmd('Y', argvect[2]);
+        }
+         if (i==6)
+        {
+            ZonaNotte = defaultZonaNotte;   
+            Zona Giorno = defaultZonaGiorno;
+            ZonaBagni =defaultZonaBagni;
+            P0ZonaUnica = defaultP0ZonaUnica;
+        }
+    }
     // Gestione sequenziale degli Input e degli Output e della seriale, con periodo di un secondo
     if (PLCPulse1000)
     {
@@ -210,33 +322,16 @@ int i,j;
 
         switch (nextaction)
         {
-            case 0: //void   ManageHeatingInputs(void);
-//cambiato il 20/11/2010 mattina
-//		    DI[TERMOSTATOP0] = PLCOpI(TERMOSTATOP0);
-//		    DI[TERMOSTATOP1] = PLCOpI(TERMOSTATOP1);           
-#ifdef DBG_LEVEL
-        if (dbg1 == 1)
-        {
-            printf("first loop : case 0. Pass order: %d /n", dbg2);
-            dbg2++;
-        }
-#endif
-
-            break;
+            case 0:
+                ;
+                break;
 
             case 1:
-#ifdef DBG_LEVEL
-        if (dbg1 == 1)
-        {
-            printf("first loop : case 1. Pass order: %d/n", dbg2);
-            dbg2++;
-        }        
-#endif
                 ManageHeatingOutputs();
                 break;
 
 	        case 2:
-		        ParseCOM();
+                ;
 		        break;
 
             default:
@@ -247,13 +342,15 @@ int i,j;
 }
 
 
-void ParseCOM(void)
+// @Section("Custom Function - 0.7.2")  nuovo parsecom
+// ritorna il numero del comando, sempre >0, in caso di successo
+// ritorna 0 no operation (ad esempio sta leggendo la riga)
+// ritorna <0 per errori
+char ParseCOM2(char *argcnt, char *argvect)
 {
-static unsigned char cmd=0;
-static unsigned char op_len;
-static unsigned char op_cnt;
-static unsigned char parm1;
-char c;
+
+char *p;
+char c, i, retcmd;
 
 // Manage the serial port "A" tick.
     SetTermIOVectors(IOSerialPortA); //Set the serial port A as I/O console
@@ -264,89 +361,68 @@ char c;
 
         // Read the received character.
         c=GetCh();
-
-        // a seconda del comando e' previsto dopo un operando di lunghezza op_len
-        switch (c)
+        if ( (isalnum(c) || isspace(c) || (c == ':')) && (c!= 13) ) 
         {
-            case 'H': //impostazione ora. Operando 2chr: hh
-            case 'm': //impostazione minuti. Operando 2chr: mm 
-            case 'M': //impostazione mese ed anno. Operando 2chr: MM
-            case 'Y': //impostazione anno. Operando 2chr: YY
-    	    case 'C': //leggi vettore confort Piano 1. Operando 2chr: 00-23
-	        case 'D': //leggi vettore confort Piano 0. Operando 2chr: 00-23
-	        case 'I': //leggi input  x (00-15)
-	        case 'O': //leggi output x (00-07)
-	            cmd=c;
-	            op_len=2; 
-  	            op_cnt= parm1=0;
-                break;
-
-//configurazine vettore comfort piano 1
-            case 'X': //imposta tutto spento alle ore hh. Operando 2chr: hh
-    	    case 'A': //imposta tutto acceso alle ore hh. Operando 2chr: hh
-	        case 'G': //imposta zona giorno accesa alle ore hh. Operando 2chr: hh
-	        case 'N': //imposta zona notte accesa alle ore hh. Operando 2chr: hh
-	        case 'B': //imposta zona bagni accesa alle ore hh. Operando 2chr: hh
-	            cmd=c;
-	            op_len=2; 
-  	            op_cnt= parm1=0;
-                break;
-
-//configurazine vettore comfort piano 0
-            case 'x': //imposta tutto spento alle ore hh. Operando 2chr: hh
-    	    case 'a': //imposta tutto acceso alle ore hh. Operando 2chr: hh
-	        case 'g': //imposta zona giorno accesa alle ore hh. Operando 2chr: hh
-	        case 'n': //imposta zona notte accesa alle ore hh. Operando 2chr: hh
-	        case 'b': //imposta zona notte accesa alle ore hh. Operando 2chr: hh
-	            cmd=c;
-	            op_len=2; 
-  	            op_cnt= parm1=0;
-                break;
-
-            case 'S': //leggi stato
-            case 'T': //leggi ora
-
-	            cmd=c;
-	            ExecuteCmd(cmd, parm1);
-	            op_len= op_cnt= cmd = parm1 = 0; //reset 
-                break;
-
-         case '0': case '1': case '2': case '3': case '4':
-         case '5': case '6': case '7': case '8': case '9':
-            op_cnt++;
-		    if ((op_len == 0) || (cmd==0) || (op_len<op_cnt))
-		    {	// errore !
-			    cmd=op_len=op_cnt=parm1=0; //reset
-//                printf("inside ParseCOM.switch.3; cmd %u\n", cmd);
-
-                break;
-		    }    
-		    if (op_cnt == 1) 
+            cmdline[chptr]=c;
+            chptr++;
+#ifdef DBG_PARSECOM
+printf("c:%d cmdline[]:%c chptr:%d\n",c, cmdline[chptr-1],chptr);
+#endif 
+            if (chptr==CMDLINEMAXLEN) //overflow
             {
-			    parm1= (c - '0') ;
-//                printf("char1=%u\n",parm1);
-                break;
+                chptr=0;
+                cmdline[0]='\0';
+#ifdef DBG_PARSECOM
+                printf("Error 1- cmdline overflow\n");
+#endif            
+                return (-1);
             }
-		    if (op_cnt == 2) 
-			{
-                parm1= (c - '0') + parm1*10;
-//                printf("char1=%u\n",parm1);
-//                printf("inside ParseCOM.switch.5; cmd %u\n", cmd);
+        }    
+        else if (c==13) //enter fine della riga di comando
+        {
+            cmdline[chptr]='\0';
+            chptr=0;
+            printf("\ncmdline=%s\n",cmdline);
 
-		        ExecuteCmd(cmd, parm1);
-	            cmd=op_len=op_cnt = parm1=0;            
-	            return;
-            }
-            default:
-		        cmd=op_len=op_cnt= parm1=0;            
-	        return;
+            for (retcmd=0;retcmd<6;retcmd++)
+            	if ( (strstr(cmdline,commandlist[retcmd].cmd)) )
+                		break; //trovato il comando 
+	        	
+            if (retcmd== NUMCOMANDI) // non ho trovato comandi
+                return (-16);
+
+            p=cmdline+strlen(commandlist[retcmd].cmd);
+
+            for (i=0; i<commandlist[retcmd].argnum; i++)
+            {
+    		//errore mi attendo un separatore
+    		if ( ((*p)!=' ') && ((*p) != ':') )
+    			return (-retcmd-16*1);
+           
+    		//skip all white spaces
+    		while (isspace(*p) || ((*p)==':'))
+    			p++; 
+
+		//errore string terminata prima di aver letto tutti i parametri
+    		if ((*p)== '\0') 
+    			return (-retcmd-16*2);
+
+    		//convert all digits
+            	argvect[i]=0;
+    		while (isdigit(*p))
+                    	argvect[i] = argvect[i]*10 + (*(p++))-'0';          
+	    }    
+
+    	// return parameter
+    	*argcnt=commandlist[retcmd].argnum;
+    	return (retcmd);
         }
-  }
+    }
+    return (0);
 }
 
 char ExecuteCmd(unsigned char cmd, unsigned char parm1)
 {
-//static RTCDATA RtcData; //Rtc data structure
 char i;
 //  printf ("inside ExcuteCMD. cmd=%u parm1=%u", cmd, parm1);
   
@@ -369,6 +445,13 @@ char i;
         if (parm1>59) 
             return (-1);
         RtcData.Minute = parm1;
+        SetRtc(&RtcData); //Write the RTC registers with the new values
+        break;
+
+        case 'd': //impostazione giorno. Operando 2chr: gg
+        if (parm1>31)
+            return (-1);     
+        RtcData.Day = parm1;
         SetRtc(&RtcData); //Write the RTC registers with the new values
         break;
 
@@ -428,29 +511,10 @@ char i;
 	    case 'S': //leggi stato
         // @Section("Custom Function - 0.7.0") - riduzione object code usando cicli for
         // 24 byte comfort vector piano 0
-/*        printf ( "%c%c%c%c", comfortP0[0],comfortP0[1],comfortP0[2],comfortP0[3]);
-        printf ( "%c%c%c%c", comfortP0[4],comfortP0[5],comfortP0[6],comfortP0[7]);
-        printf ( "%c%c%c%c", comfortP0[8],comfortP0[9],comfortP0[10],comfortP0[11]);
-        printf ( "%c%c%c%c", comfortP0[12],comfortP0[13],comfortP0[14],comfortP0[15]);
-        printf ( "%c%c%c%c", comfortP0[16],comfortP0[17],comfortP0[18],comfortP0[19]);
-        printf ( "%c%c%c%c", comfortP0[20],comfortP0[21],comfortP0[22],comfortP0[23]);
-
-        // 24 byte comfort vector piano 1
-        printf ( "%c%c%c%c", comfortP1[0],comfortP1[1],comfortP1[2],comfortP1[3]);
-        printf ( "%c%c%c%c", comfortP1[4],comfortP1[5],comfortP1[6],comfortP1[7]);
-        printf ( "%c%c%c%c", comfortP1[8],comfortP1[9],comfortP1[10],comfortP1[11]);
-        printf ( "%c%c%c%c", comfortP1[12],comfortP1[13],comfortP1[14],comfortP1[15]);
-        printf ( "%c%c%c%c", comfortP1[16],comfortP1[17],comfortP1[18],comfortP1[19]);
-        printf ( "%c%c%c%c", comfortP1[20],comfortP1[21],comfortP1[22],comfortP1[23]);
-*/
         for (i=0;i<24;i++) printf ( "%c", comfortP0[i]);
         for (i=0;i<24;i++) printf ( "%c", comfortP1[i]);
 
         // 16 byte input
-//        printf ( "%u%u%u%u", DI[0],DI[1],DI[2],DI[3] );
-//        printf ( "%u%u%u%u", DI[4],DI[5],DI[6],DI[7] );
-//        printf ( "%u%u%u%u", DI[8],DI[9],DI[10],DI[11] );
-//        printf ( "%u%u%u%u", DI[12],DI[13],DI[14],DI[15] );
         for (i=0;i<16;i++) printf ( "%u", DI[i]);
 
         // 8 byte output
@@ -671,3 +735,5 @@ void   ManageHeatingOutputs(void)
 //        TotTermoON += PreviousStatus;
 
 }
+
+

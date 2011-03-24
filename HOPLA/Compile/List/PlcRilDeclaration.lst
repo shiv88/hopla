@@ -1,4 +1,4 @@
-RC51 COMPILER V03.03.37,  PLCRILDECLARATION      02/26/11  15:33:43  PAGE  1
+RC51 COMPILER V03.03.37,  PLCRILDECLARATION      03/16/11  19:51:57  PAGE  1
 
 QCW(0x0002AE52)
 
@@ -27,18 +27,23 @@ stmt level    source
   15          10,10,10,10,10,10,10,10,
   16          };
   17          unsigned char PLCLogicInputDebouncingBuffer[24];
-  18          #pragma noinitstaticvar
-  19          at PLC_BACKUP_COPY_START_ADDRESS BACKUPHEADERSTRUCT PLCBackupHeader;
-  20          at (PLC_BACKUP_COPY_START_ADDRESS+sizeof(BACKUPHEADERSTRUCT)) unsigned char PLCBackupDataArea[128];
-  21          #pragma initstaticvar
-  22          
-  23          //[End of File]
-  24          
-RC51 COMPILER V03.03.37,  PLCRILDECLARATION      02/26/11  15:33:43  PAGE  2
+  18          at 0x5CC unsigned long PLC_DW_P1ZonaNotte;
+  19          at 0x5D0 unsigned long PLC_DW_P1ZonaGiorno;
+  20          at 0x5D4 unsigned long PLC_DW_P1ZonaBagni;
+  21          at 0x5D8 unsigned long PLC_DW_P0ZonaUnica;
+  22          at 0x5C0 unsigned char PLCBackupDummy0[12];
+  23          #pragma noinitstaticvar
+  24          at PLC_BACKUP_COPY_START_ADDRESS BACKUPHEADERSTRUCT PLCBackupHeader;
+  25          at (PLC_BACKUP_COPY_START_ADDRESS+sizeof(BACKUPHEADERSTRUCT)) unsigned char PLCBackupDataArea[184];
+  26          #pragma initstaticvar
+  27          
+  28          //[End of File]
+  29          
+RC51 COMPILER V03.03.37,  PLCRILDECLARATION      03/16/11  19:51:57  PAGE  2
 
 ASSEMBLY LISTING OF GENERATED OBJECT CODE
 
-RC51 COMPILER V03.03.37,  PLCRILDECLARATION      02/26/11  15:33:43  PAGE  3
+RC51 COMPILER V03.03.37,  PLCRILDECLARATION      03/16/11  19:51:57  PAGE  3
 
 NAME                                    CLASS   MSPACE  TYPE    OFFSET  SIZE
 ====                                    =====   ======  ====    ======  ====
@@ -46,7 +51,7 @@ NAME                                    CLASS   MSPACE  TYPE    OFFSET  SIZE
 PLCRtcData . . . . . . . . . . . . . .  PUBLIC  XDATA   STRUCT  0000H   8    
 PLCLogicInputDebouncingTime. . . . . .  PUBLIC  XDATA   ARRAY   0008H   24   
 PLCLogicInputDebouncingBuffer. . . . .  PUBLIC  XDATA   ARRAY   0020H   24   
-RC51 COMPILER V03.03.37,  PLCRILDECLARATION      02/26/11  15:33:43  PAGE  4
+RC51 COMPILER V03.03.37,  PLCRILDECLARATION      03/16/11  19:51:58  PAGE  4
 
 
 

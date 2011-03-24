@@ -1,9 +1,9 @@
 --------------------------------------------------------
 Project: HOPLA
 
-Project comment: 0.7.1
+Project comment: 0.7.2
 
-Project info: Build: 29 of 26 February 2011 15:33:40
+Project info: Build: 59 of 16 March 2011 20:00:05
 Build with Remoter ver: 8.2.2
 
 --------------------------------------------------------
@@ -82,4 +82,3 @@ Media for debug: Nothing
 Project Files:
     .\RilFile.ril
     .\CFile.c
-    .\DownloadFile1.rdn

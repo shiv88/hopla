@@ -8,6 +8,7 @@
 
 ; @Section("C Function call")
 
+
         SVIW  O   0000                                        ;Logic output managed from "C"
         SVIW  O   0001                                        ;Logic output managed from "C"
         SVIW  O   0002                                        ;Logic output managed from "C"
@@ -36,3 +37,10 @@
         ORGR
         LODF  F   0001                                        ;Generic Flag
         TASK  L   CustomFunction                              ;C function
+
+
+; @Section("8.0.0 - Retain confort vector")
+  DEFB DW  P1ZonaNotte    ;Backup double word
+  DEFB DW  P1ZonaGiorno   ;Backup double word
+  DEFB DW  P1ZonaBagni   ;Backup double word
+  DEFB DW  P0ZonaUnica   ;Backup double word
