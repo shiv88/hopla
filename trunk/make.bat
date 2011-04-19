@@ -1,0 +1,1 @@
+..\..\tcc\tcc -I. main.c CFile.c parser.c -o ..\..\tmp\maincfile.exe

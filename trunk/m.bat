@@ -1,1 +1,0 @@
-..\tcc\tcc -I..\hopla\trunk\ ..\hopla\trunk\main.c ..\hopla\trunk\CFile.c ..\hopla\trunk\parser.c

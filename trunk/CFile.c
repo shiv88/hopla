@@ -76,9 +76,10 @@
 #define DBG_FIRSTLOOP 0x0001
 #define DBG_PARSECOM  0x0002
 #define DBG_GETSTRINGCOM 0x0004
+#define DBG_MANAGEOUTPUT 0x0008
 
 char dbg1, dbg2;
-char debuglevel=DBG_FIRSTLOOP;
+char debuglevel=  0 ;
 
 // -----------------------------------------------------------------------------
 // global variable declarations
@@ -172,13 +173,11 @@ void CustomFunction(void)
 SERIALSTRUCT SerialStruct; //Serial parameters
 int i,j;
 
-printf("custom: %d", PLCFirstLoop);
+    if (debuglevel) printf("\nentrato in CustomFunction");
 
     if (PLCFirstLoop)
     {
-	if (debuglevel & DBG_FIRSTLOOP) printf("\nDBG_FIRSTLOOP 01: entrato in PLCFirstLoop");
-
-
+	if (debuglevel & DBG_FIRSTLOOP) printf("\nDBG_FIRSTLOOP 01: entrato in PLCFirstLoop");
  // Enable the serial communication on serial port "" and define parameters.
  // Set serial at 19200, e, 8. DTR automatically managed without any time
         SetTermIOVectors(IOSerialPortA); //Set the serial port A as I/O console
@@ -203,39 +202,37 @@ printf("custom: %d", PLCFirstLoop);
         PreviousStatus = 0;
         TotMinutiON=TotOreON=0;
         GetRtc (&RtcPLCSTARTTime);
-	if (debuglevel & DBG_FIRSTLOOP) printf("\nDBG_FIRSTLOOP 03: finita lettura RTC"); 
+	
+        if (debuglevel & DBG_FIRSTLOOP) printf("\nDBG_FIRSTLOOP 03: finita lettura RTC"); 
 
       // @Section("Custom Function - 0.7.1")  statistiche
-
         for (i=0;i<12;i++)
             for (j=0;j<31;j++)
                 StatMinutiON[i][j]=0; 
- 	if (debuglevel & DBG_FIRSTLOOP)
+ 
+	if (debuglevel & DBG_FIRSTLOOP)
 	{
 	  printf("\nDBG_FIRSTLOOP 04: finito PLCFirtsLoop"); 
           dbg1 = 1; //1 ==> first loop
           dbg2 = 1; 	
 	}	
-
-
     }
 
     //cambiato il 20/11/2010 mattina
-        DI[TERMOSTATOP0] = PLCOpI(TERMOSTATOP0);
-	DI[TERMOSTATOP1CORR] = PLCOpI(TERMOSTATOP1CORR);           
-	DI[TERMOSTATOP1PAOLO] = PLCOpI(TERMOSTATOP1PAOLO);           
-	DI[TERMOSTATOP1GIORNO] = PLCOpI(TERMOSTATOP1GIORNO);
-     	
-
+    DI[TERMOSTATOP0] = PLCOpI(TERMOSTATOP0);
+    DI[TERMOSTATOP1CORR] = PLCOpI(TERMOSTATOP1CORR);           
+    DI[TERMOSTATOP1PAOLO] = PLCOpI(TERMOSTATOP1PAOLO);           
+    DI[TERMOSTATOP1GIORNO] = PLCOpI(TERMOSTATOP1GIORNO);
 
     // input/outpout via seriale
-  if (GetstringCOM() > 0)
-  { 
-  i=ParseCOM(cmdline, &argcnt, argvect);
-    if (i>0)
-    {
+    if (GetstringCOM() > 0)
+    { 
+      i=ParseCOM(cmdline, &argcnt, argvect);
+
+      if (i>0)
+      {
 	if (debuglevel & DBG_PARSECOM)
-        	printf ("funziona:%d\n",i);
+        	printf ("\nfunziona:%d\n",i);
         if (i==1)
             ExecuteCmd('S', 0);
         if (i==3)
@@ -253,17 +250,10 @@ printf("custom: %d", PLCFirstLoop);
             ExecuteCmd('M', argvect[1]);
             ExecuteCmd('Y', argvect[2]);
         }
-//        if (i==6)
-//        {
-//            ZonaNotte = defaultZonaNotte;   
-//            Zona Giorno = defaultZonaGiorno;
-//            ZonaBagni =defaultZonaBagni;
-//            P0ZonaUnica = defaultP0ZonaUnica;
-//        }
- 
+
    }
 }
-    // Gestione sequenziale degli Input e degli Output e della seriale, con periodo di un secondo
+    // Gestione sequenziale delle actions, con periodo di un secondo
     if (PLCPulse1000)
     {
         if (nextaction==2)
@@ -279,20 +269,13 @@ printf("custom: %d", PLCFirstLoop);
                 ManageHeatingOutputs();
                 break;
 
-	        case 2:
-                ;
-		        break;
-
             default:
                 return;
         }
         nextaction++;
     } 
 }
-char pippo (char j)
-{
-;
-}
+
 // @Section("Custom Function - 0.8.2")  nuovo getstring
 // ritorna 1 se la stringa e' completata con successo con un \n
 // ritorna 0 se sta ancora leggendo la string
@@ -489,6 +472,8 @@ char i;
 void   ManageHeatingOutputs(void)
 {
 
+    if (debuglevel & DBG_MANAGEOUTPUT) printf("\nDBG_MANAGEOUTPUT 01: entrato in ManageHeatingOutputs");
+
     GetRtc(&RtcData); //Read the current RTC registers
 
     DO[ZONA1B]= FALSE ; // zona bagni e corridoio 
@@ -500,6 +485,8 @@ void   ManageHeatingOutputs(void)
     // First level heating zones corridoio
     if (DI[TERMOSTATOP1CORR])
     {
+        if (debuglevel & DBG_MANAGEOUTPUT) printf("\nDBG_MANAGEOUTPUT 02: entrato in DI[TERMOSTATOP1CORR]");
+
 //        switch(comfortP1[PLCRtcHour])
           switch(comfortP1[RtcData.Hour])
         {
@@ -523,6 +510,7 @@ void   ManageHeatingOutputs(void)
     // @Section("Custom Function - 0.6.1")
     if (DI[TERMOSTATOP1PAOLO])
     {
+        if (debuglevel & DBG_MANAGEOUTPUT) printf("\nDBG_MANAGEOUTPUT 03: entrato in DI[TERMOSTATOP1PAOLO]");
 //        switch(comfortP1[PLCRtcHour])
           switch(comfortP1[RtcData.Hour])
         {
@@ -544,6 +532,7 @@ void   ManageHeatingOutputs(void)
    // @Section("Custom Function - 0.6.1")
     if (DI[TERMOSTATOP1GIORNO])
     {
+        if (debuglevel & DBG_MANAGEOUTPUT) printf("\nDBG_MANAGEOUTPUT 04: entrato in DI[TERMOSTATOP1GIORNO]");
 //        switch(comfortP1[PLCRtcHour])
           switch(comfortP1[RtcData.Hour])
         {
@@ -564,6 +553,7 @@ void   ManageHeatingOutputs(void)
     // Level zero heating zone
     if (DI[TERMOSTATOP0])
     {
+        if (debuglevel & DBG_MANAGEOUTPUT) printf("\nDBG_MANAGEOUTPUT 05: entrato in DI[TERMOSTATOP0]");
         switch(comfortP0[RtcData.Hour])
         {
         case 'A':
@@ -599,6 +589,7 @@ void   ManageHeatingOutputs(void)
 // @Section("Custom Function - 0.7.0")
     if (!openvalves) 
     {
+        if (debuglevel & DBG_MANAGEOUTPUT) printf("\nDBG_MANAGEOUTPUT 06: entrato in !openvalves");
         switch(RtcData.Hour%3)
         {   
 	    case 0: PLCOpO(ZONA1B)= TRUE ; // zona bagni e corridoio P1    
@@ -611,7 +602,6 @@ void   ManageHeatingOutputs(void)
                 break;
         }
     }
-
 
 // gestisco accensine/spegnimento a cavallo di 2 giorni
 // @Section("Custom Function - 0.7.1")  statistiche

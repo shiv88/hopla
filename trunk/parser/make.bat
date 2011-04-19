@@ -1,0 +1,1 @@
+..\..\..\tcc\tcc -I.. main.c ..\parser.c -o ..\..\..\tmp\testparser.exe
