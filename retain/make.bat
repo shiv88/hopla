@@ -1,0 +1,1 @@
+..\..\..\tcc\tcc -I.. main.c ..\retain.c -o ..\..\..\tmp\testretain.exe

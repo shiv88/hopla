@@ -20,7 +20,7 @@ struct cmd_descr commandlist[]= {
 {"nop", 0 },
 {"status", 0},
 {"timeset", 3},
-{"timeread",3}, 
+{"timeread", 0}, 
 {"dataset", 3},
 {"dataread",0} 
 };
