@@ -19,6 +19,20 @@ char IOSerialPortA;
 #define ZONA1G 5
 #define ZONA1B 6
 #define ZONAP0 7
+
+void fakeTTY(char *s)
+{
+char i;
+  fakegetrxchar=TRUE;
+//  strcpy (s,"timeread\r");
+  for (i=0; i<strlen(s);i++)
+  {
+    fakechar=s[i];
+    CustomFunction();
+  }
+  fakegetrxchar=FALSE;
+}
+
 void printoutput(void)
 {
   if (PLC_output[HEATER_ON]) printf ("HEATER_ON - ");
@@ -39,7 +53,7 @@ main ()
 int i;
 char s[40];
 
-  printf("\nmain\n");
+
   PLCFirstLoop=TRUE;
   PLCPulse1000 = FALSE;
   IOSerialPortA =0;
@@ -57,6 +71,7 @@ char s[40];
   CustomFunction();
   printoutput();
 
+/*
   fakeRtcData.Hour=7;
   CustomFunction();
   CustomFunction();
@@ -84,6 +99,13 @@ char s[40];
     CustomFunction();
   }
   fakegetrxchar=FALSE;
+*/
+ fakeTTY("timeset 07:55\r");
+ fakeTTY("dataset 20 4 11\r");
+ fakeTTY("status\r");
+ fakeTTY("timeread\r");
+
+
 }
 
 void SetTermIOVectors(char c)
